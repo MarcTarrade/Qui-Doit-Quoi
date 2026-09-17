@@ -1,12 +1,21 @@
 package com.quidoitquoi.api.models;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
@@ -32,6 +41,18 @@ public class User {
 
     @Column(name = "img", length = 2048)
     private String img;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "admin")
+    private List<Group> groups = new ArrayList<>();
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private Instant updatedAt;
 
     protected User() {
         // Required by JPA.
@@ -87,5 +108,17 @@ public class User {
 
     public void setImg(String img) {
         this.img = img;
+    }
+
+    public List<Group> getGroups() {
+        return groups;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }
