@@ -30,6 +30,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
     }
 
+    @ExceptionHandler(MemberNotFoundException.class)
+    public ResponseEntity<ApiError> handleMemberNotFound(
+            MemberNotFoundException exception,
+            HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
+    }
+
     @ExceptionHandler({
             HttpMessageNotReadableException.class,
             MethodArgumentNotValidException.class,
