@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import com.quidoitquoi.api.exceptions.MemberNotFoundException;
 import com.quidoitquoi.api.models.Member;
 import com.quidoitquoi.api.services.MemberService;
@@ -43,7 +45,7 @@ public class MemberController {
     @PostMapping("/groups/{groupId}/members")
     public ResponseEntity<Member> addMember(
             @PathVariable UUID groupId,
-            @RequestBody Member member) {
+            @Valid @RequestBody Member member) {
         Member createdMember = memberService.addMember(groupId, member);
         return ResponseEntity.created(URI.create("/api/members/" + createdMember.getId()))
                 .body(createdMember);
@@ -52,7 +54,7 @@ public class MemberController {
     @PutMapping("/members/{id}")
     public ResponseEntity<Member> updateMember(
             @PathVariable UUID id,
-            @RequestBody Member member) {
+            @Valid @RequestBody Member member) {
         Member updatedMember = memberService.updateMember(id, member)
             .orElseThrow(() -> new MemberNotFoundException(id));
         return ResponseEntity.ok(updatedMember);

@@ -19,6 +19,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 @Entity 
 @Table(name = "expenses")
@@ -28,12 +32,17 @@ public class Expense {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
+    @NotBlank(message = "Expense description is required")
+    @Size(max = 1000, message = "Description must not exceed 1000 characters")
     @Column(nullable = false, length = 1000)
     private String description;
 
+    @NotNull(message = "Amount is required")
+    @Positive(message = "Amount must be greater than zero")
     @Column(nullable = false)
     private Long amount;
 
+    @NotNull(message = "Category is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Category category;
