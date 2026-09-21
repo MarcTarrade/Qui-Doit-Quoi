@@ -43,6 +43,10 @@ public class User {
     private String img;
 
     @JsonIgnore
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
+
+    @JsonIgnore
     @OneToMany(mappedBy = "admin")
     private List<Group> groups = new ArrayList<>();
 
@@ -64,6 +68,14 @@ public class User {
         this.img = img;
         this.lastname = lastname;
         this.firstname = firstname;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public UUID getId() {
