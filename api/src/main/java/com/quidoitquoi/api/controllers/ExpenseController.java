@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.quidoitquoi.api.exceptions.ExpenseNotFoundException;
 import com.quidoitquoi.api.models.Expense;
@@ -22,6 +26,8 @@ import com.quidoitquoi.api.services.ExpenseService;
 
 @RestController
 @RequestMapping("/api")
+@Tag(name = "Expenses", description = "Shared expense management")
+@SecurityRequirement(name = "bearerAuth")
 public class ExpenseController {
 
     private final ExpenseService expenseService;
@@ -31,11 +37,16 @@ public class ExpenseController {
     }
 
     @GetMapping("/groups/{groupId}/expenses")
+    @Operation(summary = "List group expenses", description = "Returns all expenses belonging to a group UUID.")
+    @ApiResponse(responseCode = "200", description = "Expenses returned")
     public ResponseEntity<List<Expense>> getExpensesByGroupId(@PathVariable UUID groupId) {
         return ResponseEntity.ok(expenseService.getExpensesByGroupId(groupId));
     }
 
     @GetMapping("/expenses/{id}")
+    @Operation(summary = "Get an expense", description = "Returns one expense by UUID.")
+    @ApiResponse(responseCode = "200", description = "Expense returned")
+    @ApiResponse(responseCode = "404", description = "Expense not found")
     public ResponseEntity<Expense> getExpenseById(@PathVariable UUID id) {
         Expense expense = expenseService.getExpenseById(id)
                 .orElseThrow(() -> new ExpenseNotFoundException(id));
@@ -43,6 +54,10 @@ public class ExpenseController {
     }
 
     @PostMapping("/groups/{groupId}/expenses")
+    @Operation(summary = "Add an expense", description = "Adds a validated expense to a group.")
+    @ApiResponse(responseCode = "201", description = "Expense created")
+    @ApiResponse(responseCode = "400", description = "Request validation failed")
+    @ApiResponse(responseCode = "404", description = "Group not found")
     public ResponseEntity<Expense> addExpense(
             @PathVariable UUID groupId,
             @Valid @RequestBody Expense expense) {
@@ -52,6 +67,10 @@ public class ExpenseController {
     }
 
     @PutMapping("/expenses/{id}")
+    @Operation(summary = "Update an expense", description = "Updates an existing expense by UUID.")
+    @ApiResponse(responseCode = "200", description = "Expense updated")
+    @ApiResponse(responseCode = "400", description = "Request validation failed")
+    @ApiResponse(responseCode = "404", description = "Expense not found")
     public ResponseEntity<Expense> updateExpense(
             @PathVariable UUID id,
             @Valid @RequestBody Expense expense) {
@@ -61,6 +80,9 @@ public class ExpenseController {
     }
 
     @DeleteMapping("/expenses/{id}")
+    @Operation(summary = "Delete an expense", description = "Deletes an expense by UUID.")
+    @ApiResponse(responseCode = "204", description = "Expense deleted")
+    @ApiResponse(responseCode = "404", description = "Expense not found")
     public ResponseEntity<Void> deleteExpense(@PathVariable UUID id) {
         if (!expenseService.deleteExpense(id)) {
             throw new ExpenseNotFoundException(id);
