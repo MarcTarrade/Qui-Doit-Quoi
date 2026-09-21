@@ -7,12 +7,15 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.quidoitquoi.api.models.Group;
+import com.quidoitquoi.api.models.Settlement;
 
 @Service
 public interface GroupService {
     List<Group> getGroupsByUserId(UUID userId);
 
     Optional<Group> getGroupById(UUID id);
+
+    List<Settlement> calculateSettlements(UUID groupId);
 
     Group createGroup(UUID userId, Group group);
 

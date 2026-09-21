@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.quidoitquoi.api.exceptions.GroupNotFoundException;
 import com.quidoitquoi.api.models.Group;
+import com.quidoitquoi.api.models.Settlement;
 import com.quidoitquoi.api.services.GroupService;
 
 @RestController
@@ -38,6 +39,11 @@ public class GroupController {
         Group group = groupService.getGroupById(id)
                 .orElseThrow(() -> new GroupNotFoundException(id));
         return ResponseEntity.ok(group);
+    }
+
+    @GetMapping("/{id}/settlements")
+    public ResponseEntity<List<Settlement>> getSettlements(@PathVariable UUID id) {
+        return ResponseEntity.ok(groupService.calculateSettlements(id));
     }
 
     @PostMapping("/{userId}")
