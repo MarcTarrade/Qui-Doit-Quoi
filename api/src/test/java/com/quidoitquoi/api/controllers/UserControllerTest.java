@@ -104,6 +104,22 @@ class UserControllerTest {
     }
 
     @Test
+    void createUserRejectsInvalidInput() throws Exception {
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "",
+                                  "lastname": "Doe",
+                                  "firstname": "John",
+                                  "email": "invalid-email",
+                                  "img": "https://example.com/john-doe.jpg"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void updateUserReturnsUpdatedUser() throws Exception {
         when(userService.updateUser(eq(USER_ID), any(User.class))).thenReturn(Optional.of(user));
 

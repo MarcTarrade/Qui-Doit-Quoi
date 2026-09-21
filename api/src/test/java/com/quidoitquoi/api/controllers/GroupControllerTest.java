@@ -123,6 +123,23 @@ class GroupControllerTest {
     }
 
     @Test
+    void createGroupRejectsInvalidInput() throws Exception {
+        mockMvc.perform(post("/api/groups/{userId}", USER_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "",
+                                  "description": "Shared trip expenses",
+                                  "img": "https://example.com/trip.jpg",
+                                  "currency": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("Group name is required")))
+                .andExpect(jsonPath("$.message").value(containsString("Currency is required")));
+    }
+
+    @Test
     void updateGroupReturnsUpdatedGroup() throws Exception {
         when(groupService.updateGroup(eq(GROUP_ID), any(Group.class))).thenReturn(Optional.of(group));
 

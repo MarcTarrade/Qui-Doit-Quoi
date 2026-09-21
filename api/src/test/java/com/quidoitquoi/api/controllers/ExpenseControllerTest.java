@@ -121,6 +121,23 @@ class ExpenseControllerTest {
     }
 
     @Test
+    void addExpenseRejectsInvalidInput() throws Exception {
+        mockMvc.perform(post("/api/groups/{groupId}/expenses", GROUP_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "description": "",
+                                  "amount": -1,
+                                  "category": "FOOD",
+                                  "paidBy": {
+                                    "id": "%s"
+                                  }
+                                }
+                                """.formatted(MEMBER_ID)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void updateExpenseReturnsUpdatedExpense() throws Exception {
         when(expenseService.updateExpense(eq(EXPENSE_ID), any(Expense.class)))
                 .thenReturn(Optional.of(expense));
