@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import com.quidoitquoi.api.exceptions.UserNotFoundException;
 import com.quidoitquoi.api.models.User;
 import com.quidoitquoi.api.services.UserService;
@@ -40,14 +42,14 @@ public class UserController {
 	}
 
 	@PostMapping
-	public ResponseEntity<User> createUser(@RequestBody User user) {
+	public ResponseEntity<User> createUser(@Valid @RequestBody User user) {
 		User createdUser = userService.createUser(user);
 		return ResponseEntity.created(URI.create("/api/users/" + createdUser.getId()))
 				.body(createdUser);
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<User> updateUser(@PathVariable UUID id, @RequestBody User user) {
+	public ResponseEntity<User> updateUser(@PathVariable UUID id, @Valid @RequestBody User user) {
 		User updatedUser = userService.updateUser(id, user)
 				.orElseThrow(() -> new UserNotFoundException(id));
 		return ResponseEntity.ok(updatedUser);

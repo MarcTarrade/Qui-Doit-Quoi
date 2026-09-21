@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import com.quidoitquoi.api.exceptions.ExpenseNotFoundException;
 import com.quidoitquoi.api.models.Expense;
 import com.quidoitquoi.api.services.ExpenseService;
@@ -43,7 +45,7 @@ public class ExpenseController {
     @PostMapping("/groups/{groupId}/expenses")
     public ResponseEntity<Expense> addExpense(
             @PathVariable UUID groupId,
-            @RequestBody Expense expense) {
+            @Valid @RequestBody Expense expense) {
         Expense createdExpense = expenseService.addExpense(groupId, expense);
         return ResponseEntity.created(URI.create("/api/expenses/" + createdExpense.getId()))
                 .body(createdExpense);
@@ -52,7 +54,7 @@ public class ExpenseController {
     @PutMapping("/expenses/{id}")
     public ResponseEntity<Expense> updateExpense(
             @PathVariable UUID id,
-            @RequestBody Expense expense) {
+            @Valid @RequestBody Expense expense) {
         Expense updatedExpense = expenseService.updateExpense(id, expense)
                 .orElseThrow(() -> new ExpenseNotFoundException(id));
         return ResponseEntity.ok(updatedExpense);

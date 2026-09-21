@@ -85,6 +85,35 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("Invalid email or password"));
     }
 
+    @Test
+    void signupRejectsInvalidInput() throws Exception {
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "",
+                                  "lastname": "Doe",
+                                  "firstname": "John",
+                                  "email": "not-an-email",
+                                  "password": " "
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginRejectsInvalidInput() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "not-an-email",
+                                  "password": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
     private String signupJson() {
         return """
                 {

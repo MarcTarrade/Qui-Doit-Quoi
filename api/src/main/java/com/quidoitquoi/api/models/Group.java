@@ -18,6 +18,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 @Entity
 @Table(name = "groups")
@@ -28,15 +31,21 @@ public class Group {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
+    @NotBlank(message = "Group name is required")
+    @Size(max = 100, message = "Group name must not exceed 100 characters")
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Size(max = 1000, message = "Description must not exceed 1000 characters")
     @Column(length = 1000)
     private String description;
 
+    @Size(max = 2048, message = "Image URL must not exceed 2048 characters")
     @Column(name = "img", length = 2048)
     private String img;
 
+    @NotBlank(message = "Currency is required")
+    @Pattern(regexp = "^[A-Z]{3}$", message = "Currency must be a 3-letter ISO code")
     @Column(nullable = false, length = 3)
     private String currency;
 

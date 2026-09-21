@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import com.quidoitquoi.api.exceptions.GroupNotFoundException;
 import com.quidoitquoi.api.models.Group;
 import com.quidoitquoi.api.models.Settlement;
@@ -47,14 +49,14 @@ public class GroupController {
     }
 
     @PostMapping("/{userId}")
-    public ResponseEntity<Group> createGroup(@PathVariable UUID userId, @RequestBody Group group) {
+    public ResponseEntity<Group> createGroup(@PathVariable UUID userId, @Valid @RequestBody Group group) {
         Group createdGroup = groupService.createGroup(userId, group);
         return ResponseEntity.created(URI.create("/api/groups/" + createdGroup.getId()))
                 .body(createdGroup);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Group> updateGroup(@PathVariable UUID id, @RequestBody Group group) {
+    public ResponseEntity<Group> updateGroup(@PathVariable UUID id, @Valid @RequestBody Group group) {
         Group updatedGroup = groupService.updateGroup(id, group)
                 .orElseThrow(() -> new GroupNotFoundException(id));
         return ResponseEntity.ok(updatedGroup);

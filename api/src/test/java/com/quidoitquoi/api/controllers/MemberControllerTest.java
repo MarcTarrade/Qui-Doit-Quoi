@@ -69,6 +69,21 @@ class MemberControllerTest {
     }
 
     @Test
+    void addMemberRejectsInvalidInput() throws Exception {
+        mockMvc.perform(post("/api/groups/{groupId}/members", GROUP_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "",
+                                  "user": {
+                                    "id": "%s"
+                                  }
+                                }
+                                """.formatted(USER_ID)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void getMembersByGroupReturnsMembers() throws Exception {
         when(memberService.getMembersByGroupId(GROUP_ID)).thenReturn(List.of(member));
 

@@ -1,6 +1,7 @@
 package com.quidoitquoi.api.exceptions;
 
 import java.time.Instant;
+import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -49,9 +51,28 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
     }
 
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request) {
+        String message = exception.getBindingResult().getFieldErrors().stream()
+                .map(FieldError::getDefaultMessage)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.joining("; "));
+        if (message.isBlank()) {
+            message = exception.getBindingResult().getGlobalErrors().stream()
+                    .map(error -> error.getDefaultMessage() == null ? "The request is invalid" : error.getDefaultMessage())
+                    .collect(Collectors.joining("; "));
+        }
+        if (message.isBlank()) {
+            message = "The request is invalid";
+        }
+        return buildResponse(HttpStatus.BAD_REQUEST, message, request);
+    }
+
     @ExceptionHandler({
             HttpMessageNotReadableException.class,
-            MethodArgumentNotValidException.class,
             MethodArgumentTypeMismatchException.class
     })
     public ResponseEntity<ApiError> handleBadRequest(Exception exception, HttpServletRequest request) {

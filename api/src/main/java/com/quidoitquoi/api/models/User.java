@@ -17,6 +17,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 @Entity
 @Table(name = "users")
@@ -27,18 +30,27 @@ public class User {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
+    @NotBlank(message = "Username is required")
+    @Size(max = 50, message = "Username must not exceed 50 characters")
     @Column(nullable = false, unique = false, length = 50)
     private String username;
 
+    @NotBlank(message = "Last name is required")
+    @Size(max = 100, message = "Last name must not exceed 100 characters")
     @Column(nullable = false, unique = false, length = 100)
     private String lastname;
 
+    @NotBlank(message = "First name is required")
+    @Size(max = 100, message = "First name must not exceed 100 characters")
     @Column(nullable = false, unique = false, length = 100)
     private String firstname;
 
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email must be a valid address")
     @Column(nullable = false, unique = true, length = 254)
     private String email;
 
+    @Size(max = 2048, message = "Image URL must not exceed 2048 characters")
     @Column(name = "img", length = 2048)
     private String img;
 
