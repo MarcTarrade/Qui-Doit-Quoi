@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.quidoitquoi.api.exceptions.GlobalExceptionHandler;
 import com.quidoitquoi.api.models.Group;
+import com.quidoitquoi.api.models.Settlement;
 import com.quidoitquoi.api.models.User;
 import com.quidoitquoi.api.services.GroupService;
 
@@ -95,6 +96,18 @@ class GroupControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
     }
+
+        @Test
+        void getSettlementsReturnsTransfers() throws Exception {
+        when(groupService.calculateSettlements(GROUP_ID)).thenReturn(List.of(
+            new Settlement(USER_ID, "John", GROUP_ID, "Jane", 3000L)));
+
+        mockMvc.perform(get("/api/groups/{id}/settlements", GROUP_ID))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].fromMemberName").value("John"))
+            .andExpect(jsonPath("$[0].toMemberName").value("Jane"))
+            .andExpect(jsonPath("$[0].amount").value(3000));
+        }
 
     @Test
     void createGroupReturnsCreatedGroupAndLocation() throws Exception {
