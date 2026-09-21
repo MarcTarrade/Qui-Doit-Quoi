@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
@@ -51,6 +52,7 @@ public class Group {
 
     @ManyToOne
     @JoinColumn(name = "admin_id")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private User admin;
 
     @OneToMany(mappedBy = "group")
