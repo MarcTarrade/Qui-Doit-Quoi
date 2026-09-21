@@ -1,8 +1,8 @@
 package com.quidoitquoi.api.models;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
+
+import java.time.Instant;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -11,42 +11,41 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
-@Entity
-@Table(name = "groups")
-public class Group {
-
+@Entity 
+@Table(name = "expenses")
+public class Expense {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @Column(nullable = false, length = 100)
-    private String name;
-
-    @Column(length = 1000)
+    @Column(nullable = false, length = 1000)
     private String description;
 
-    @Column(name = "img", length = 2048)
-    private String img;
+    @Column(nullable = false)
+    private Long amount;
 
-    @Column(nullable = false, length = 3)
-    private String currency;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Category category;
 
     @ManyToOne
-    @JoinColumn(name = "admin_id")
-    private User admin;
+    @JoinColumn(name = "paid_by")
+    private Member paidBy;
 
-    @OneToMany(mappedBy = "group")
-    @JsonIgnore
-    private List<Member> members;
+    @ManyToOne 
+    @JoinColumn(name = "group_id")
+    @JsonIgnore 
+    private Group group;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -56,28 +55,20 @@ public class Group {
     @Column(nullable = false)
     private Instant updatedAt;
 
-    protected Group() {
+    protected Expense() {
         // Required by JPA.
     }
 
-    public Group(String name, String description, String img, String currency, User admin) {
-        this.name = name;
+    public Expense(String description, Long amount, Category category, Member paidBy, Group group) {
         this.description = description;
-        this.img = img;
-        this.currency = currency;
-        this.admin = admin;
+        this.amount = amount;
+        this.category = category;
+        this.paidBy = paidBy;
+        this.group = group;
     }
 
     public UUID getId() {
         return id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
     }
 
     public String getDescription() {
@@ -88,28 +79,36 @@ public class Group {
         this.description = description;
     }
 
-    public String getImg() {
-        return img;
+    public Long getAmount() {
+        return amount;
     }
 
-    public void setImg(String img) {
-        this.img = img;
+    public void setAmount(Long amount) {
+        this.amount = amount;
     }
 
-    public String getCurrency() {
-        return currency;
+    public Category getCategory() {
+        return category;
     }
 
-    public void setCurrency(String currency) {
-        this.currency = currency;
+    public void setCategory(Category category) {
+        this.category = category;
     }
 
-    public User getAdmin() {
-        return admin;
+    public Member getPaidBy() {
+        return paidBy;
     }
 
-    public void setAdmin(User admin) {
-        this.admin = admin;
+    public void setPaidBy(Member paidBy) {
+        this.paidBy = paidBy;
+    }
+
+    public Group getGroup() {
+        return group;
+    }
+
+    public void setGroup(Group group) {
+        this.group = group;
     }
 
     public Instant getCreatedAt() {
