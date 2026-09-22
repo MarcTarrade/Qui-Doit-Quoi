@@ -138,9 +138,16 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     public Group createGroup(UUID userId, Group group) {
-        group.setAdmin(userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId)));
-        return groupRepository.save(group);
+        var admin = userRepository.findById(userId)
+            .orElseThrow(() -> new UserNotFoundException(userId));
+        group.setAdmin(admin);
+        Group savedGroup = groupRepository.save(group);
+
+        Member adminMember = new Member(admin.getUsername(), savedGroup);
+        adminMember.setUser(admin);
+        memberRepository.save(adminMember);
+
+        return savedGroup;
     }
 
     @Override
