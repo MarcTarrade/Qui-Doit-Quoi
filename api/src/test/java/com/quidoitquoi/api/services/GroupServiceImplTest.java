@@ -47,6 +47,19 @@ class GroupServiceImplTest {
     }
 
     @Test
+    void getGroupsByUserIdReturnsGroupsAdministeredOrJoinedByUser() {
+        Group administeredGroup = mock(Group.class);
+        Group joinedGroup = mock(Group.class);
+        when(userRepository.findById(ALICE_ID)).thenReturn(java.util.Optional.of(mock(User.class)));
+        when(groupRepository.findDistinctByAdmin_IdOrMembers_User_Id(ALICE_ID, ALICE_ID))
+                .thenReturn(List.of(administeredGroup, joinedGroup));
+
+        List<Group> groups = groupService.getGroupsByUserId(ALICE_ID);
+
+        assertThat(groups).containsExactly(administeredGroup, joinedGroup);
+    }
+
+    @Test
     void calculateSettlementsReturnsWhoOwesWho() {
         Member alice = member(ALICE_ID, "Alice");
         Member bob = member(BOB_ID, "Bob");
