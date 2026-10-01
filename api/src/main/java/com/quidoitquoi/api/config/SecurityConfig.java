@@ -12,6 +12,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -40,6 +43,17 @@ public class SecurityConfig {
             @Value("${security.jwt.secret}") String jwtSecret) {
         this.userRepository = userRepository;
         this.jwtSecret = jwtSecret;
+    }
+
+    @Bean
+    @Order(1)
+    @Profile("dev")
+    SecurityFilterChain devSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher("/api/dev/session")
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/dev/session"))
+            .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
+        return http.build();
     }
 
     @Bean
