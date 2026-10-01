@@ -44,7 +44,7 @@ public class GroupServiceImpl implements GroupService {
     public List<Group> getGroupsByUserId(UUID userId) {
         userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
-        return groupRepository.findByAdmin_Id(userId);
+        return groupRepository.findDistinctByAdmin_IdOrMembers_User_Id(userId, userId);
     }
 
     @Override
