@@ -53,17 +53,6 @@ public class SecurityConfig {
     }
 
     @Bean
-    @Order(1)
-    @Profile("dev")
-    SecurityFilterChain devSecurityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .securityMatcher("/api/dev/session")
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/dev/session"))
-            .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
-        return http.build();
-    }
-
-    @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             CorsConfigurationSource corsConfigurationSource,
