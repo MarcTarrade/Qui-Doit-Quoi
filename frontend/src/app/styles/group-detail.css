@@ -318,6 +318,50 @@
   cursor: wait;
 }
 
+.group-balances {
+  padding: 2rem;
+  border: 1px solid var(--grey-100);
+  border-radius: 0.9375rem;
+  background: white;
+}
+
+.group-balances h2 {
+  margin: 0 0 0.75rem;
+  color: var(--text);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.group-balances__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.group-balances__row {
+  display: flex;
+  min-height: 4.125rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--grey-100);
+  color: var(--text);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.group-balances__row strong {
+  flex: none;
+  font-size: 1.5rem;
+}
+
+.group-balances__empty {
+  margin: 0;
+  padding: 1.25rem 0 0;
+  border-top: 1px solid var(--grey-100);
+  color: var(--grey-500);
+}
+
 @media (max-width: 700px) {
   .group-detail__header {
     position: relative;
@@ -381,6 +425,23 @@
   .group-detail__content {
     width: calc(100% - 2.75rem);
     margin: 1.75rem auto 6rem;
+  }
+
+  .group-balances {
+    padding: 1.25rem;
+  }
+
+  .group-balances h2 {
+    font-size: 1.25rem;
+  }
+
+  .group-balances__row {
+    min-height: 3.75rem;
+    font-size: 1rem;
+  }
+
+  .group-balances__row strong {
+    font-size: 1.125rem;
   }
 
   .group-expense-list {
