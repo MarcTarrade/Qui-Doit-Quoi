@@ -1,0 +1,10 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="bar_chart_4_bars">
+<mask id="mask0_0_26" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30">
+<rect id="Bounding box" width="30" height="30" fill="#D9D9D9"/>
+</mask>
+<g mask="url(#mask0_0_26)">
+<path id="bar_chart_4_bars_2" d="M2.5 26.25V23.75H27.5V26.25H2.5ZM3.75 22.5V13.75H7.5V22.5H3.75ZM10 22.5V7.5H13.75V22.5H10ZM16.25 22.5V11.25H20V22.5H16.25ZM22.5 22.5V3.75H26.25V22.5H22.5Z" fill="#9692E3"/>
+</g>
+</g>
+</svg>

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import SiteHeader from "@/components/auth/SiteHeader";
@@ -228,33 +229,35 @@ export default function Home() {
               {groupsState === "ready" && groups.length > 0 && (
                 <ul className="home-group-list">
                   {groups.map((group) => (
-                    <li className="home-group-card" key={group.id}>
-                      <Image
-                        alt=""
-                        className="home-group-card__avatar home-group-card__avatar--desktop"
-                        height={59}
-                        src={group.img || "/groups/group-avatar.svg"}
-                        unoptimized
-                        width={59}
-                      />
-                      <Image
-                        alt=""
-                        className="home-group-card__avatar home-group-card__avatar--mobile"
-                        height={50}
-                        src={group.img || "/groups/group-avatar-mobile.svg"}
-                        unoptimized
-                        width={50}
-                      />
-                      <div className="home-group-card__details">
-                        <h3>{group.name}</h3>
-                        <div className="home-group-card__metadata">
-                          <span>{group.memberCount} {group.memberCount === 1 ? "member" : "members"}</span>
-                          <Image alt="" className="home-group-card__separator" height={5} src="/groups/separator-dot.svg" width={5} />
-                          <span className="home-group-card__expenses">
-                            {group.expenseCount} {group.expenseCount === 1 ? "expense" : "expenses"}
-                          </span>
+                    <li key={group.id}>
+                      <Link className="home-group-card" href={`/groups/${encodeURIComponent(group.id)}`}>
+                        <Image
+                          alt=""
+                          className="home-group-card__avatar home-group-card__avatar--desktop"
+                          height={59}
+                          src={group.img || "/groups/group-avatar.svg"}
+                          unoptimized
+                          width={59}
+                        />
+                        <Image
+                          alt=""
+                          className="home-group-card__avatar home-group-card__avatar--mobile"
+                          height={50}
+                          src={group.img || "/groups/group-avatar-mobile.svg"}
+                          unoptimized
+                          width={50}
+                        />
+                        <div className="home-group-card__details">
+                          <h3>{group.name}</h3>
+                          <div className="home-group-card__metadata">
+                            <span>{group.memberCount} {group.memberCount === 1 ? "member" : "members"}</span>
+                            <Image alt="" className="home-group-card__separator" height={5} src="/groups/separator-dot.svg" width={5} />
+                            <span className="home-group-card__expenses">
+                              {group.expenseCount} {group.expenseCount === 1 ? "expense" : "expenses"}
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      </Link>
                     </li>
                   ))}
                 </ul>
