@@ -293,6 +293,25 @@ export default function GroupDetailPage() {
 
       <section aria-labelledby="expenses-title" className="group-detail__content">
         <h2 className="visually-hidden" id="expenses-title">Group expenses</h2>
+        {loadState === "ready" && members.length > 0 && (
+          <button
+            className="group-detail__add-button"
+            onClick={() => {
+              setAddExpenseError("");
+              setIsAddExpenseOpen(true);
+            }}
+            type="button"
+          >
+            <Image
+              alt=""
+              height={20}
+              src="/group-detail/add-mobile.svg"
+              unoptimized
+              width={20}
+            />
+            <span>Add an expense</span>
+          </button>
+        )}
         {loadState === "loading" && (
           <p className="group-detail__status" role="status">Loading expenses…</p>
         )}
