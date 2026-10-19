@@ -1,10 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { apiRequest, apiRequestWithCsrf } from "@/lib/api";
 import type { AuthUser } from "@/lib/auth-types";
+
+type AuthStatusProps = {
+  onUserChange?: (user: AuthUser | null) => void;
+};
 
 function isAuthUser(value: unknown): value is AuthUser {
   if (typeof value !== "object" || value === null) return false;
@@ -17,20 +22,34 @@ function isAuthUser(value: unknown): value is AuthUser {
   );
 }
 
-export default function AuthStatus() {
+export default function AuthStatus({ onUserChange }: AuthStatusProps) {
+  const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [error, setError] = useState("");
+  const onUserChangeRef = useRef(onUserChange);
+
+  useEffect(() => {
+    onUserChangeRef.current = onUserChange;
+  }, [onUserChange]);
 
   useEffect(() => {
     const controller = new AbortController();
     apiRequest("/api/users/me", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
-        if (!response.ok) return;
+        if (!response.ok) {
+          onUserChangeRef.current?.(null);
+          return;
+        }
         const result: unknown = await response.json();
-        if (isAuthUser(result)) setUser(result);
+        const nextUser = isAuthUser(result) ? result : null;
+        setUser(nextUser);
+        onUserChangeRef.current?.(nextUser);
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!controller.signal.aborted) onUserChangeRef.current?.(null);
+      })
       .finally(() => setIsLoading(false));
 
     return () => controller.abort();
@@ -38,42 +57,53 @@ export default function AuthStatus() {
 
   async function signOut() {
     setIsSigningOut(true);
+    setError("");
     try {
       const response = await apiRequestWithCsrf("/api/auth/logout", { method: "POST" });
-      if (response.ok) setUser(null);
-    } catch {
-      return;
+      if (!response.ok) {
+        throw new Error(`Sign out failed (${response.status}).`);
+      }
+      setUser(null);
+      onUserChangeRef.current?.(null);
+      router.replace("/");
+      router.refresh();
+    } catch (signOutError) {
+      setError(
+        signOutError instanceof Error ? signOutError.message : "An unexpected error occurred.",
+      );
     } finally {
       setIsSigningOut(false);
     }
   }
 
-  if (isLoading) {
-    return <span aria-label="Loading account" className="h-8 w-28 animate-pulse bg-[#18231d]/10" />;
-  }
-
-  if (user) {
-    return (
-      <div className="flex items-center gap-4">
-        <span className="hidden text-sm text-[#536158] sm:inline">{user.firstname}</span>
-        <button
-          className="text-xs font-semibold uppercase tracking-[0.12em] text-[#536158] underline underline-offset-4 hover:text-[#18231d] disabled:opacity-60"
-          disabled={isSigningOut}
-          onClick={signOut}
-          type="button"
-        >
-          {isSigningOut ? "Signing out" : "Sign out"}
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <nav aria-label="Account" className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.12em]">
-      <Link className="text-[#536158] hover:text-[#18231d]" href="/login">Sign in</Link>
-      <Link className="border border-[#18231d]/25 px-3 py-2 text-[#18231d] hover:border-[#c35d3e]" href="/signup">
-        Sign up
-      </Link>
-    </nav>
+    <div className="site-header__account">
+      {isLoading ? (
+        <span aria-label="Loading account" className="auth-account-loading" />
+      ) : user ? (
+        <>
+          <span className="site-header__identity">
+            <span className="site-header__avatar" aria-hidden="true">
+              {user.firstname.charAt(0).toUpperCase()}
+            </span>
+            <span className="site-header__identity-name">{user.firstname}</span>
+          </span>
+          <button
+            className="site-header__signout"
+            disabled={isSigningOut}
+            onClick={signOut}
+            type="button"
+          >
+            {isSigningOut ? "Signing out…" : "Sign out"}
+          </button>
+        </>
+      ) : (
+        <>
+          <Link className="site-header__signin" href="/login">Sign in</Link>
+          <Link className="site-header__signup" href="/signup">Sign up</Link>
+        </>
+      )}
+      {error && <p className="site-header__error" role="alert">{error}</p>}
+    </div>
   );
 }
