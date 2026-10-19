@@ -1,7 +1,9 @@
 package com.quidoitquoi.api.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -94,6 +96,23 @@ class GroupServiceImplTest {
         assertThat(memberCaptor.getValue().getName()).isEqualTo("admin");
         assertThat(memberCaptor.getValue().getGroup()).isSameAs(group);
         assertThat(memberCaptor.getValue().getUser()).isSameAs(admin);
+    }
+
+    @Test
+    void updateGroupPreservesExistingAdmin() {
+        Group existingGroup = mock(Group.class);
+        Group updatedDetails = mock(Group.class);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(java.util.Optional.of(existingGroup));
+        when(groupRepository.save(existingGroup)).thenReturn(existingGroup);
+
+        Group result = groupService.updateGroup(GROUP_ID, updatedDetails).orElseThrow();
+
+        assertThat(result).isSameAs(existingGroup);
+        verify(existingGroup).setName(updatedDetails.getName());
+        verify(existingGroup).setDescription(updatedDetails.getDescription());
+        verify(existingGroup).setImg(updatedDetails.getImg());
+        verify(existingGroup).setCurrency(updatedDetails.getCurrency());
+        verify(existingGroup, never()).setAdmin(any(User.class));
     }
 
     private Member member(UUID id, String name) {

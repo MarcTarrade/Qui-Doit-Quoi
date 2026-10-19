@@ -29,6 +29,10 @@
   display: none;
 }
 
+.group-detail__settings-link {
+  display: none;
+}
+
 .group-detail__tabs {
   display: grid;
   width: min(69rem, calc(100% - 3rem));
@@ -362,6 +366,191 @@
   color: var(--grey-500);
 }
 
+.group-settings {
+  display: grid;
+  gap: 2.125rem;
+}
+
+.group-settings__card {
+  display: grid;
+  gap: 1.125rem;
+  padding: 2.5rem;
+  border: 1px solid var(--grey-100);
+  border-radius: 0.9375rem;
+  background: white;
+}
+
+.group-settings__card h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.group-settings__information {
+  grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.65fr);
+  column-gap: 3rem;
+}
+
+.group-settings__information h2,
+.group-settings__save {
+  grid-column: 1 / -1;
+}
+
+.group-settings__fields {
+  display: grid;
+  align-content: start;
+  gap: 1.125rem;
+}
+
+.group-settings label {
+  display: grid;
+  gap: 0.4375rem;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.group-settings input,
+.group-settings textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--grey-200);
+  border-radius: 0.5rem;
+  background: white;
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.group-settings textarea {
+  min-height: 7.5rem;
+  resize: vertical;
+}
+
+.group-settings input:focus-visible,
+.group-settings textarea:focus-visible,
+.group-settings button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.group-settings__image {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 0.75rem;
+}
+
+.group-settings__image-title {
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.group-settings__image-preview {
+  position: relative;
+  display: grid;
+  width: 10.625rem;
+  height: 10.625rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.group-settings__image-picture {
+  display: block;
+  width: 10.625rem;
+  height: 10.625rem;
+  border: 1px solid var(--grey-100);
+  border-radius: 50%;
+  background: #f1f0ff;
+  object-fit: cover;
+}
+
+.group-settings__image-add {
+  position: absolute;
+  top: calc(50% - 1.25rem);
+  left: calc(50% - 1.25rem);
+}
+
+.group-settings__save {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.group-settings__save .group-detail__form-submit {
+  width: auto;
+  padding: 0 1.25rem;
+}
+
+.group-settings__success {
+  margin: 0;
+  color: var(--primary);
+  font-size: 0.875rem;
+}
+
+.group-settings__members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.group-settings__member {
+  display: flex;
+  min-height: 4.125rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--grey-100);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.group-settings__member button {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.group-settings__member button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.group-settings__add-member {
+  display: flex;
+  align-items: end;
+  gap: 1rem;
+}
+
+.group-settings__add-member label {
+  flex: 1;
+}
+
+.group-settings__add-member .group-detail__form-submit {
+  width: auto;
+  padding: 0 1.25rem;
+}
+
+.group-settings__activity p {
+  margin: 0;
+  color: var(--grey-500);
+}
+
 @media (max-width: 700px) {
   .group-detail__header {
     position: relative;
@@ -380,6 +569,15 @@
   .group-detail__back {
     position: absolute;
     left: 1rem;
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+  }
+
+  .group-detail__settings-link {
+    position: absolute;
+    right: 1rem;
     display: grid;
     width: 2rem;
     height: 2rem;
@@ -442,6 +640,47 @@
 
   .group-balances__row strong {
     font-size: 1.125rem;
+  }
+
+  .group-settings {
+    gap: 1rem;
+  }
+
+  .group-settings__card {
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  .group-settings__card h2 {
+    font-size: 1.25rem;
+  }
+
+  .group-settings__information {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .group-settings__information h2,
+  .group-settings__save {
+    grid-column: auto;
+  }
+
+  .group-settings__image {
+    justify-items: center;
+  }
+
+  .group-settings__image label {
+    width: 100%;
+  }
+
+  .group-settings__save,
+  .group-settings__add-member {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .group-settings__save .group-detail__form-submit,
+  .group-settings__add-member .group-detail__form-submit {
+    width: 100%;
   }
 
   .group-expense-list {

@@ -157,7 +157,6 @@ public class GroupServiceImpl implements GroupService {
             existingGroup.setDescription(group.getDescription());
             existingGroup.setImg(group.getImg());
             existingGroup.setCurrency(group.getCurrency());
-            existingGroup.setAdmin(group.getAdmin());
             return groupRepository.save(existingGroup);
         });
     }

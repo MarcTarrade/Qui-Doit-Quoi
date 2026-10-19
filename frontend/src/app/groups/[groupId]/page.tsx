@@ -280,6 +280,13 @@ export default function GroupDetailPage() {
           <Image alt="" height={32} src="/group-detail/back-mobile.svg" width={32} />
         </Link>
         <h1>{group?.name ?? (loadState === "loading" ? "Loading group…" : "Group details")}</h1>
+        <Link
+          aria-label="Group settings"
+          className="group-detail__settings-link"
+          href={`/groups/${encodeURIComponent(groupId)}/settings`}
+        >
+          <Image alt="" height={32} src="/group-detail/more-mobile.svg" width={32} />
+        </Link>
       </header>
 
       <GroupSectionNav activeSection="expenses" groupId={groupId} />
