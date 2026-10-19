@@ -1,19 +1,34 @@
-@import "tailwindcss";
+@import "./styles/auth.css";
 
 :root {
-  --background: #f3f0e8;
-  --foreground: #18231d;
+  --primary: #5048E5;
+  --secondary: #9692E3;
+  --tertiary: #C27AA3;
+  --text: #040042;
+  --background: #F1F0FF;
+  --foreground: #040042;
+  --grey-50: #F5F5F8;
+  --grey-100: #EBEAF2;
+  --grey-200: #DBDAE6;
+  --grey-300: #C2C0D4;
+  --grey-400: #8D8AAC;
+  --grey-500: #66638C;
+  --grey-700: #2B255F;
+  --success: #1FA97C;
+  --error: #E5484D;
+  --warning: #F5A524;
+  --info: #2D9CDB;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), sans-serif;
+  font-family: var(--font-inter), sans-serif;
 }
