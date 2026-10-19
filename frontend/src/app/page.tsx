@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import AuthStatus from "@/components/auth/AuthStatus";
 import { apiUrl, checkApiConnection } from "@/lib/api";
 
 export default function Home() {
@@ -18,7 +19,7 @@ export default function Home() {
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col justify-between">
         <header className="flex items-center justify-between border-b border-[#18231d]/15 pb-5">
           <p className="text-sm font-semibold uppercase tracking-[0.18em]">Qui doit quoi</p>
-          <span className="text-xs uppercase tracking-[0.16em] text-[#536158]">Workspace</span>
+          <AuthStatus />
         </header>
 
         <section className="grid gap-12 py-16 lg:grid-cols-[1.4fr_0.8fr] lg:items-end">

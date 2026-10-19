@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +42,16 @@ public class UserController {
 	@ApiResponse(responseCode = "200", description = "Users returned")
 	public ResponseEntity<List<User>> getAllUsers() {
 		return ResponseEntity.ok(userService.getAllUsers());
+	}
+
+	@GetMapping("/me")
+	@Operation(summary = "Get the current user", description = "Returns the authenticated user.")
+	@ApiResponse(responseCode = "200", description = "Current user returned")
+	public ResponseEntity<User> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
+		UUID id = UUID.fromString(jwt.getSubject());
+		User user = userService.getUserById(id)
+				.orElseThrow(() -> new UserNotFoundException(id));
+		return ResponseEntity.ok(user);
 	}
 
 	@GetMapping("/{id}")

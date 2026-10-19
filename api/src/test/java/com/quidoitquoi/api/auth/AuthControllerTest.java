@@ -5,6 +5,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class AuthControllerTest {
     }
 
     @Test
-    void signupReturnsCreatedTokenAndUser() throws Exception {
+        void signupSetsHttpOnlyCookieAndReturnsUserWithoutToken() throws Exception {
         User user = new User("jdoe", "john.doe@example.com", null, "Doe", "John");
         when(authService.signup(any(SignupRequest.class)))
                 .thenReturn(new AuthResponse("signup-token", user));
@@ -44,13 +45,15 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signupJson()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.token").value("signup-token"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("QDQ-AUTH=signup-token")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("HttpOnly")))
+                .andExpect(jsonPath("$.token").doesNotExist())
                 .andExpect(jsonPath("$.user.email").value("john.doe@example.com"))
                 .andExpect(jsonPath("$.user.passwordHash").doesNotExist());
     }
 
     @Test
-    void loginReturnsTokenAndUser() throws Exception {
+        void loginSetsHttpOnlyCookieAndReturnsUserWithoutToken() throws Exception {
         User user = new User("jdoe", "john.doe@example.com", null, "Doe", "John");
         when(authService.login(any(LoginRequest.class)))
                 .thenReturn(new AuthResponse("login-token", user));
@@ -64,9 +67,19 @@ class AuthControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("login-token"))
+                                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("QDQ-AUTH=login-token")))
+                                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("HttpOnly")))
+                                .andExpect(jsonPath("$.token").doesNotExist())
                 .andExpect(jsonPath("$.user.username").value("jdoe"));
     }
+
+        @Test
+        void logoutClearsAuthenticationCookie() throws Exception {
+                mockMvc.perform(post("/api/auth/logout"))
+                                .andExpect(status().isOk())
+                                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("QDQ-AUTH=")))
+                                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
+        }
 
     @Test
     void loginReturnsUnauthorizedForInvalidCredentials() throws Exception {
