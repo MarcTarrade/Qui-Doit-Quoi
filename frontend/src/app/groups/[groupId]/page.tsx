@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
+import GroupSectionNav from "@/components/groups/GroupSectionNav";
 import { apiRequest, apiRequestWithCsrf } from "@/lib/api";
 
 type Group = {
@@ -281,20 +282,7 @@ export default function GroupDetailPage() {
         <h1>{group?.name ?? (loadState === "loading" ? "Loading group…" : "Group details")}</h1>
       </header>
 
-      <nav aria-label="Group sections" className="group-detail__tabs">
-        <span aria-current="page" className="group-detail__tab group-detail__tab--active">
-          <Image alt="" height={24} src="/group-detail/expenses-mobile.svg" width={24} />
-          <span>Expenses</span>
-        </span>
-        <span aria-disabled="true" className="group-detail__tab group-detail__tab--unavailable">
-          <Image alt="" height={24} src="/group-detail/balances-mobile.svg" width={24} />
-          <span>Balances</span>
-        </span>
-        <span aria-disabled="true" className="group-detail__tab group-detail__tab--unavailable">
-          <Image alt="" height={24} src="/group-detail/statistics-mobile.svg" width={24} />
-          <span>Statistics</span>
-        </span>
-      </nav>
+      <GroupSectionNav activeSection="expenses" groupId={groupId} />
 
       <section aria-labelledby="expenses-title" className="group-detail__content">
         <h2 className="visually-hidden" id="expenses-title">Group expenses</h2>

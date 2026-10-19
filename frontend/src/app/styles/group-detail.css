@@ -30,12 +30,55 @@
 }
 
 .group-detail__tabs {
-  display: none;
+  display: grid;
+  width: min(69rem, calc(100% - 3rem));
+  min-height: 4.375rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  gap: 0.375rem;
+  margin: 2rem auto 0;
+  padding: 0 0.5rem;
+  border: 1px solid var(--grey-100);
+  border-radius: 1.25rem;
+  background: white;
 }
 
 .group-detail__content {
   width: min(69rem, calc(100% - 3rem));
-  margin: 7.5rem auto 3rem;
+  margin: 2rem auto 3rem;
+}
+
+.group-detail__tab {
+  display: flex;
+  min-width: 0;
+  min-height: 3.375rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 2rem;
+  color: var(--secondary);
+  font-size: 1rem;
+  line-height: 1.15;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.group-detail__tab--active {
+  background: #f1f0ff;
+  color: var(--primary);
+}
+
+.group-detail__tab--unavailable {
+  opacity: 0.9;
+}
+
+.group-detail__tab-icon {
+  display: block;
+  flex: none;
+}
+
+.group-detail__tab-icon--mobile {
+  display: none;
 }
 
 .group-expense-list {
@@ -300,37 +343,39 @@
   }
 
   .group-detail__tabs {
-    display: grid;
+    box-sizing: border-box;
+    width: 100%;
     min-height: 4.25rem;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-items: center;
-    gap: 0.375rem;
+    margin: 0;
     padding: 0 0.75rem;
+    border: 0;
     border-bottom: 1px solid var(--grey-400);
+    border-radius: 0;
+    background: transparent;
   }
 
   .group-detail__tab {
-    display: flex;
-    min-width: 0;
     min-height: 3.625rem;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
     gap: 0.125rem;
-    border-radius: 2rem;
-    color: var(--secondary);
     font-size: clamp(0.875rem, 4.6vw, 1.25rem);
-    line-height: 1.15;
-    white-space: nowrap;
   }
 
   .group-detail__tab--active {
     background: white;
-    color: var(--primary);
   }
 
-  .group-detail__tab--unavailable {
-    opacity: 0.9;
+  .group-detail__tab--settings {
+    display: none;
+  }
+
+  .group-detail__tab-icon--desktop {
+    display: none;
+  }
+
+  .group-detail__tab-icon--mobile {
+    display: block;
   }
 
   .group-detail__content {
