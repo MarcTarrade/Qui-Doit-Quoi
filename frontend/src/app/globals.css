@@ -1,5 +1,6 @@
 @import "./styles/auth.css";
 @import "./styles/home.css";
+@import "./styles/group-detail.css";
 
 :root {
   --primary: #5048E5;
