@@ -5,30 +5,43 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.quidoitquoi.api.exceptions.GroupNotFoundException;
 import com.quidoitquoi.api.exceptions.MemberNotFoundException;
+import com.quidoitquoi.api.exceptions.UserNotFoundException;
 import com.quidoitquoi.api.models.Expense;
+import com.quidoitquoi.api.models.Group;
+import com.quidoitquoi.api.models.GroupLog;
 import com.quidoitquoi.api.models.Member;
+import com.quidoitquoi.api.models.User;
 import com.quidoitquoi.api.repository.ExpenseRepository;
+import com.quidoitquoi.api.repository.GroupLogRepository;
 import com.quidoitquoi.api.repository.GroupRepository;
 import com.quidoitquoi.api.repository.MemberRepository;
+import com.quidoitquoi.api.repository.UserRepository;
 import com.quidoitquoi.api.services.ExpenseService;
 
 @Service
 public class ExpenseServiceImpl implements ExpenseService {
 
     private final ExpenseRepository expenseRepository;
+    private final GroupLogRepository groupLogRepository;
     private final GroupRepository groupRepository;
     private final MemberRepository memberRepository;
+    private final UserRepository userRepository;
 
     public ExpenseServiceImpl(
             ExpenseRepository expenseRepository,
+            GroupLogRepository groupLogRepository,
             GroupRepository groupRepository,
-            MemberRepository memberRepository) {
+            MemberRepository memberRepository,
+            UserRepository userRepository) {
         this.expenseRepository = expenseRepository;
+        this.groupLogRepository = groupLogRepository;
         this.groupRepository = groupRepository;
         this.memberRepository = memberRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -43,11 +56,17 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     @Override
-    public Expense addExpense(UUID groupId, Expense expense) {
-        expense.setGroup(groupRepository.findById(groupId)
-                .orElseThrow(() -> new GroupNotFoundException(groupId)));
+    @Transactional
+    public Expense addExpense(UUID groupId, Expense expense, UUID madeByUserId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(groupId));
+        User madeBy = userRepository.findById(madeByUserId)
+                .orElseThrow(() -> new UserNotFoundException(madeByUserId));
+        expense.setGroup(group);
         expense.setPaidBy(resolveMember(expense));
-        return expenseRepository.save(expense);
+        Expense savedExpense = expenseRepository.save(expense);
+        groupLogRepository.save(new GroupLog(GroupLog.EXPENSE_ADDED, group, madeBy));
+        return savedExpense;
     }
 
     @Override

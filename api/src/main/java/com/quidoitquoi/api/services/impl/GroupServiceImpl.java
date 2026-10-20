@@ -4,18 +4,27 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.quidoitquoi.api.dto.GroupLogResponse;
 import com.quidoitquoi.api.exceptions.GroupNotFoundException;
 import com.quidoitquoi.api.exceptions.UserNotFoundException;
 import com.quidoitquoi.api.models.Group;
 import com.quidoitquoi.api.models.Expense;
+import com.quidoitquoi.api.models.GroupLog;
 import com.quidoitquoi.api.models.Member;
 import com.quidoitquoi.api.models.Settlement;
+import com.quidoitquoi.api.models.User;
 import com.quidoitquoi.api.repository.ExpenseRepository;
+import com.quidoitquoi.api.repository.GroupLogRepository;
 import com.quidoitquoi.api.repository.GroupRepository;
 import com.quidoitquoi.api.repository.MemberRepository;
 import com.quidoitquoi.api.repository.UserRepository;
@@ -25,16 +34,19 @@ import com.quidoitquoi.api.services.GroupService;
 public class GroupServiceImpl implements GroupService {
 
     private final GroupRepository groupRepository;
+    private final GroupLogRepository groupLogRepository;
     private final UserRepository userRepository;
     private final MemberRepository memberRepository;
     private final ExpenseRepository expenseRepository;
 
     public GroupServiceImpl(
             GroupRepository groupRepository,
+            GroupLogRepository groupLogRepository,
             UserRepository userRepository,
             MemberRepository memberRepository,
             ExpenseRepository expenseRepository) {
         this.groupRepository = groupRepository;
+        this.groupLogRepository = groupLogRepository;
         this.userRepository = userRepository;
         this.memberRepository = memberRepository;
         this.expenseRepository = expenseRepository;
@@ -50,6 +62,25 @@ public class GroupServiceImpl implements GroupService {
     @Override
     public Optional<Group> getGroupById(UUID id) {
         return groupRepository.findById(id);
+    }
+
+    @Override
+    public Page<GroupLogResponse> getGroupLogs(UUID groupId, int page, int size) {
+        if (!groupRepository.existsById(groupId)) {
+            throw new GroupNotFoundException(groupId);
+        }
+
+        PageRequest pageable = PageRequest.of(
+                page,
+                Math.min(size, MAX_LOG_PAGE_SIZE),
+                Sort.by(Sort.Order.desc("date"), Sort.Order.desc("id")));
+        return groupLogRepository.findByGroup_Id(groupId, pageable)
+                .map(log -> new GroupLogResponse(
+                        log.getId(),
+                        log.getType(),
+                        log.getDate(),
+                        log.getMadeBy().getId(),
+                        log.getMadeBy().getUsername()));
     }
 
     @Override
@@ -151,14 +182,32 @@ public class GroupServiceImpl implements GroupService {
     }
 
     @Override
-    public Optional<Group> updateGroup(UUID id, Group group) {
-        return groupRepository.findById(id).map(existingGroup -> {
-            existingGroup.setName(group.getName());
-            existingGroup.setDescription(group.getDescription());
-            existingGroup.setImg(group.getImg());
-            existingGroup.setCurrency(group.getCurrency());
-            return groupRepository.save(existingGroup);
-        });
+    @Transactional
+    public Optional<Group> updateGroup(UUID id, Group group, UUID madeByUserId) {
+        Optional<Group> existingGroupResult = groupRepository.findById(id);
+        if (existingGroupResult.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Group existingGroup = existingGroupResult.get();
+        boolean changed = !Objects.equals(existingGroup.getName(), group.getName())
+                || !Objects.equals(existingGroup.getDescription(), group.getDescription())
+                || !Objects.equals(existingGroup.getImg(), group.getImg())
+                || !Objects.equals(existingGroup.getCurrency(), group.getCurrency());
+        User madeBy = changed
+                ? userRepository.findById(madeByUserId)
+                        .orElseThrow(() -> new UserNotFoundException(madeByUserId))
+                : null;
+
+        existingGroup.setName(group.getName());
+        existingGroup.setDescription(group.getDescription());
+        existingGroup.setImg(group.getImg());
+        existingGroup.setCurrency(group.getCurrency());
+        Group savedGroup = groupRepository.save(existingGroup);
+        if (changed) {
+            groupLogRepository.save(new GroupLog(GroupLog.GROUP_UPDATED, savedGroup, madeBy));
+        }
+        return Optional.of(savedGroup);
     }
 
     @Override
