@@ -270,7 +270,7 @@ export default function GroupSettingsPage() {
         >
           <Image alt="" height={32} src="/group-detail/back-mobile.svg" width={32} />
         </Link>
-        <h1>{group?.name ?? (loadState === "loading" ? "Loading group…" : "Group settings")}</h1>
+        <h1>{group?.name}</h1>
       </header>
 
       <GroupSectionNav activeSection="settings" groupId={groupId} />
