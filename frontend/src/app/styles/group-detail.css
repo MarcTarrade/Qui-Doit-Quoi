@@ -26,7 +26,18 @@
 }
 
 .group-detail__back {
-  display: none;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  place-items: center;
+  margin-right: 1rem;
+  border-radius: 50%;
+}
+
+.group-detail__back:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
 }
 
 .group-detail__settings-link {
@@ -280,7 +291,7 @@
 .group-detail__form-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .group-detail__form-header h2 {
@@ -289,13 +300,16 @@
 }
 
 .group-detail__form-header button {
-  width: 2rem;
-  height: 2rem;
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  place-items: center;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: var(--grey-50);
   color: var(--grey-700);
-  font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
 }

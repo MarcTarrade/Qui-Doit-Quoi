@@ -142,9 +142,9 @@ export default function GroupBalancesPage() {
     <main className="group-detail">
       <header className="group-detail__header">
         <Link
-          aria-label="Back to group expenses"
+          aria-label="Back to groups"
           className="group-detail__back"
-          href={`/groups/${encodeURIComponent(groupId)}`}
+          href="/"
         >
           <Image alt="" height={32} src="/group-detail/back-mobile.svg" width={32} />
         </Link>

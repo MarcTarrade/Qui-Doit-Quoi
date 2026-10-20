@@ -467,6 +467,11 @@ test("creates a group, adds an expense, and displays the calculated balance", as
   await page.getByRole("link", { name: /Lapland trip/ }).click();
   await expect(page.getByRole("heading", { name: "Lapland trip" })).toBeVisible();
   await expect(page.getByText("No expenses in this group yet.")).toBeVisible();
+  const backToGroupsLink = page.getByRole("link", { name: "Back to groups" });
+  await expect(backToGroupsLink).toBeVisible();
+  await backToGroupsLink.click();
+  await expect(page).toHaveURL("/");
+  await page.getByRole("link", { name: /Lapland trip/ }).click();
 
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByLabel("Add a member").fill("Alex");
@@ -474,7 +479,7 @@ test("creates a group, adds an expense, and displays the calculated balance", as
   await expect(page.getByText("Alex was added to the group.")).toBeVisible();
   expect(api.members.get("created-group-1")).toHaveLength(2);
 
-  await page.getByRole("link", { name: "Expenses" }).click();
+  await page.getByRole("link", { name: "Expenses", exact: true }).click();
   await page.getByRole("button", { name: "Add an expense" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByLabel("Description").fill("Ski passes");
@@ -492,8 +497,13 @@ test("creates a group, adds an expense, and displays the calculated balance", as
 
   await page.getByRole("link", { name: "Balances" }).click();
   await expect(page.getByRole("heading", { name: "Debt breakdown" })).toBeVisible();
+  const balancesBackLink = page.getByRole("link", { name: "Back to groups" });
+  await expect(balancesBackLink).toHaveAttribute("href", "/");
   await expect(page.getByText("Alex owes Marc")).toBeVisible();
   await expect(page.getByText("€30.00")).toBeVisible();
+  await balancesBackLink.click();
+  await expect(page).toHaveURL("/");
+  await expect(page.getByRole("heading", { name: "My groups" })).toBeVisible();
 });
 
 test("group settings update details and support add, cancel, and remove member actions", async ({
@@ -508,6 +518,8 @@ test("group settings update details and support add, cancel, and remove member a
 
   await page.goto(`/groups/${GROUP_ID}/settings`);
   await expect(page.getByRole("heading", { name: "Lapland trip" })).toBeVisible();
+  const settingsBackLink = page.getByRole("link", { name: "Back to groups" });
+  await expect(settingsBackLink).toHaveAttribute("href", "/");
 
   await page.getByLabel("Group name").fill("Updated trip");
   await page.getByLabel("Currency").fill("usd");
@@ -539,6 +551,9 @@ test("group settings update details and support add, cancel, and remove member a
   await page.getByRole("button", { name: "Remove Casey" }).click();
   await expect(page.getByText("Casey", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Casey was removed from the group.")).toBeVisible();
+  await settingsBackLink.click();
+  await expect(page).toHaveURL("/");
+  await expect(page.getByRole("heading", { name: "My groups" })).toBeVisible();
 });
 
 test("mobile group actions open and cancel the expense form", async ({ page }) => {
@@ -553,8 +568,9 @@ test("mobile group actions open and cancel the expense form", async ({ page }) =
   await page.goto(`/groups/${GROUP_ID}`);
   await page.locator("button.group-detail__add").click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Back to group" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).toHaveURL(`/groups/${GROUP_ID}`);
 
   await page.locator("button.group-detail__add").click();
   await page.getByLabel("Description").fill("Cancelled expense");

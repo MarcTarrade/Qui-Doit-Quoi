@@ -276,7 +276,11 @@ export default function GroupDetailPage() {
   return (
     <main className="group-detail">
       <header className="group-detail__header">
-        <Link aria-label="Back to groups" className="group-detail__back" href="/">
+        <Link
+          aria-label="Back to groups"
+          className="group-detail__back"
+          href="/"
+        >
           <Image alt="" height={32} src="/group-detail/back-mobile.svg" width={32} />
         </Link>
         <h1>{group?.name ?? (loadState === "loading" ? "Loading group…" : "Group details")}</h1>
@@ -388,15 +392,15 @@ export default function GroupDetailPage() {
         >
           <form className="group-detail__form" onSubmit={addExpense}>
             <div className="group-detail__form-header">
-              <h2 id="add-expense-title">Add an expense</h2>
               <button
-                aria-label="Close"
+                aria-label="Back to group"
                 disabled={isAddingExpense}
                 onClick={() => setIsAddExpenseOpen(false)}
                 type="button"
               >
-                ×
+                <Image alt="" height={24} src="/group-detail/back-mobile.svg" width={24} />
               </button>
+              <h2 id="add-expense-title">Add an expense</h2>
             </div>
             <label>
               Description
