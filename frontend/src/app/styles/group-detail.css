@@ -71,7 +71,7 @@
   justify-content: center;
   gap: 0.5rem;
   border-radius: 2rem;
-  color: var(--secondary);
+  color: var(--primary);
   font-size: 1rem;
   line-height: 1.15;
   text-decoration: none;
@@ -84,6 +84,7 @@
 }
 
 .group-detail__tab--unavailable {
+  color: var(--secondary);
   opacity: 0.9;
 }
 
