@@ -1,6 +1,7 @@
 package com.quidoitquoi.api.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -23,10 +24,10 @@ import com.quidoitquoi.api.models.Member;
 import com.quidoitquoi.api.models.User;
 import com.quidoitquoi.api.repository.ExpenseRepository;
 import com.quidoitquoi.api.repository.GroupLogRepository;
-import com.quidoitquoi.api.repository.GroupRepository;
 import com.quidoitquoi.api.repository.MemberRepository;
 import com.quidoitquoi.api.repository.UserRepository;
 import com.quidoitquoi.api.services.impl.ExpenseServiceImpl;
+import com.quidoitquoi.api.services.GroupAuthorizationService;
 
 class ExpenseServiceImplTest {
 
@@ -36,33 +37,35 @@ class ExpenseServiceImplTest {
 
     private ExpenseRepository expenseRepository;
     private GroupLogRepository groupLogRepository;
-    private GroupRepository groupRepository;
     private MemberRepository memberRepository;
     private UserRepository userRepository;
+    private GroupAuthorizationService groupAuthorizationService;
     private ExpenseServiceImpl expenseService;
 
     @BeforeEach
     void setUp() {
         expenseRepository = mock(ExpenseRepository.class);
         groupLogRepository = mock(GroupLogRepository.class);
-        groupRepository = mock(GroupRepository.class);
         memberRepository = mock(MemberRepository.class);
         userRepository = mock(UserRepository.class);
+        groupAuthorizationService = mock(GroupAuthorizationService.class);
         expenseService = new ExpenseServiceImpl(
                 expenseRepository,
                 groupLogRepository,
-                groupRepository,
                 memberRepository,
-                userRepository);
+                userRepository,
+                groupAuthorizationService);
     }
 
     @Test
     void addExpensePersistsAnActivityLogForTheAuthenticatedUser() {
         Group group = mock(Group.class);
         Member payer = mock(Member.class);
+        when(groupAuthorizationService.requireMember(GROUP_ID, USER_ID)).thenReturn(group);
+        when(payer.getGroup()).thenReturn(group);
+        when(group.getId()).thenReturn(GROUP_ID);
         User madeBy = mock(User.class);
         Expense expense = new Expense("Dinner", 4500L, Category.FOOD, payer, null);
-        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group));
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(payer));
         when(payer.getId()).thenReturn(MEMBER_ID);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(madeBy));
@@ -82,5 +85,24 @@ class ExpenseServiceImplTest {
         InOrder persistenceOrder = inOrder(expenseRepository, groupLogRepository);
         persistenceOrder.verify(expenseRepository).save(expense);
         persistenceOrder.verify(groupLogRepository).save(any(GroupLog.class));
+    }
+
+    @Test
+    void addExpenseRejectsPayerFromAnotherGroup() {
+        UUID otherGroupId = UUID.fromString("66666666-6666-6666-6666-666666666666");
+        Group group = mock(Group.class);
+        Group otherGroup = mock(Group.class);
+        Member payer = mock(Member.class);
+        Expense expense = new Expense("Dinner", 4500L, Category.FOOD, payer, null);
+        when(groupAuthorizationService.requireMember(GROUP_ID, USER_ID)).thenReturn(group);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(mock(User.class)));
+        when(payer.getId()).thenReturn(MEMBER_ID);
+        when(payer.getGroup()).thenReturn(otherGroup);
+        when(otherGroup.getId()).thenReturn(otherGroupId);
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(payer));
+
+        assertThatThrownBy(() -> expenseService.addExpense(GROUP_ID, expense, USER_ID))
+                .isInstanceOf(com.quidoitquoi.api.exceptions.MemberNotFoundException.class);
+        verify(expenseRepository, org.mockito.Mockito.never()).save(expense);
     }
 }

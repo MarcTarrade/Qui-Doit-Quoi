@@ -22,6 +22,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -49,16 +53,31 @@ class MemberControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(new MemberController(memberService))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         User user = new User("jdoe", "john.doe@example.com", null, "Doe", "John");
         Group group = new Group("Trip", "Shared trip expenses", null, "EUR", user);
         member = new Member("John", group);
+        authenticateAsUser();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private void authenticateAsUser() {
+        Jwt jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "none")
+                .subject(USER_ID.toString())
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
     }
 
     @Test
     void addMemberReturnsCreatedMember() throws Exception {
-        when(memberService.addMember(eq(GROUP_ID), any(Member.class))).thenReturn(member);
+        when(memberService.addMember(eq(GROUP_ID), any(Member.class), eq(USER_ID))).thenReturn(member);
 
         mockMvc.perform(post("/api/groups/{groupId}/members", GROUP_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -85,7 +104,7 @@ class MemberControllerTest {
 
     @Test
     void getMembersByGroupReturnsMembers() throws Exception {
-        when(memberService.getMembersByGroupId(GROUP_ID)).thenReturn(List.of(member));
+        when(memberService.getMembersByGroupId(GROUP_ID, USER_ID)).thenReturn(List.of(member));
 
         mockMvc.perform(get("/api/groups/{groupId}/members", GROUP_ID))
                 .andExpect(status().isOk())
@@ -94,7 +113,7 @@ class MemberControllerTest {
 
             @Test
             void getMemberByIdReturnsMember() throws Exception {
-            when(memberService.getMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
+            when(memberService.getMemberById(MEMBER_ID, USER_ID)).thenReturn(Optional.of(member));
 
             mockMvc.perform(get("/api/members/{id}", MEMBER_ID))
                 .andExpect(status().isOk())
@@ -103,7 +122,7 @@ class MemberControllerTest {
 
             @Test
             void getMemberByIdReturnsNotFoundWhenMemberDoesNotExist() throws Exception {
-            when(memberService.getMemberById(MEMBER_ID)).thenReturn(Optional.empty());
+            when(memberService.getMemberById(MEMBER_ID, USER_ID)).thenReturn(Optional.empty());
 
             mockMvc.perform(get("/api/members/{id}", MEMBER_ID))
                 .andExpect(status().isNotFound())
@@ -112,7 +131,7 @@ class MemberControllerTest {
 
             @Test
             void updateMemberReturnsUpdatedMember() throws Exception {
-            when(memberService.updateMember(eq(MEMBER_ID), any(Member.class)))
+            when(memberService.updateMember(eq(MEMBER_ID), any(Member.class), eq(USER_ID)))
                 .thenReturn(Optional.of(member));
 
             mockMvc.perform(put("/api/members/{id}", MEMBER_ID)
@@ -124,7 +143,7 @@ class MemberControllerTest {
 
             @Test
             void updateMemberReturnsNotFoundWhenMemberDoesNotExist() throws Exception {
-            when(memberService.updateMember(eq(MEMBER_ID), any(Member.class)))
+            when(memberService.updateMember(eq(MEMBER_ID), any(Member.class), eq(USER_ID)))
                 .thenReturn(Optional.empty());
 
             mockMvc.perform(put("/api/members/{id}", MEMBER_ID)
@@ -136,17 +155,17 @@ class MemberControllerTest {
 
             @Test
             void deleteMemberReturnsNoContent() throws Exception {
-            when(memberService.deleteMember(MEMBER_ID)).thenReturn(true);
+            when(memberService.deleteMember(MEMBER_ID, USER_ID)).thenReturn(true);
 
             mockMvc.perform(delete("/api/members/{id}", MEMBER_ID))
                 .andExpect(status().isNoContent());
 
-            verify(memberService).deleteMember(MEMBER_ID);
+            verify(memberService).deleteMember(MEMBER_ID, USER_ID);
             }
 
             @Test
             void deleteMemberReturnsNotFoundWhenMemberDoesNotExist() throws Exception {
-            when(memberService.deleteMember(MEMBER_ID)).thenReturn(false);
+            when(memberService.deleteMember(MEMBER_ID, USER_ID)).thenReturn(false);
 
             mockMvc.perform(delete("/api/members/{id}", MEMBER_ID))
                 .andExpect(status().isNotFound())
@@ -155,7 +174,7 @@ class MemberControllerTest {
 
             @Test
             void addGuestMemberDoesNotRequireUser() throws Exception {
-            when(memberService.addMember(eq(GROUP_ID), any(Member.class))).thenReturn(member);
+            when(memberService.addMember(eq(GROUP_ID), any(Member.class), eq(USER_ID))).thenReturn(member);
 
             mockMvc.perform(post("/api/groups/{groupId}/members", GROUP_ID)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -166,7 +185,7 @@ class MemberControllerTest {
 
             @Test
             void addMemberReturnsNotFoundWhenGroupDoesNotExist() throws Exception {
-            when(memberService.addMember(eq(GROUP_ID), any(Member.class)))
+            when(memberService.addMember(eq(GROUP_ID), any(Member.class), eq(USER_ID)))
                 .thenThrow(new GroupNotFoundException(GROUP_ID));
 
             mockMvc.perform(post("/api/groups/{groupId}/members", GROUP_ID)
@@ -178,7 +197,7 @@ class MemberControllerTest {
 
             @Test
             void addMemberReturnsNotFoundWhenUserDoesNotExist() throws Exception {
-            when(memberService.addMember(eq(GROUP_ID), any(Member.class)))
+            when(memberService.addMember(eq(GROUP_ID), any(Member.class), eq(USER_ID)))
                 .thenThrow(new UserNotFoundException(USER_ID));
 
             mockMvc.perform(post("/api/groups/{groupId}/members", GROUP_ID)

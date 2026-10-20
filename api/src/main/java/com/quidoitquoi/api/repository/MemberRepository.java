@@ -9,4 +9,6 @@ import com.quidoitquoi.api.models.Member;
 
 public interface MemberRepository extends JpaRepository<Member, UUID> {
     List<Member> findByGroup_Id(UUID groupId);
+
+    boolean existsByGroup_IdAndUser_Id(UUID groupId, UUID userId);
 }

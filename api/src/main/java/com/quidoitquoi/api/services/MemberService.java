@@ -7,13 +7,13 @@ import java.util.UUID;
 import com.quidoitquoi.api.models.Member;
 
 public interface MemberService {
-    List<Member> getMembersByGroupId(UUID groupId);
+    List<Member> getMembersByGroupId(UUID groupId, UUID authenticatedUserId);
 
-    Optional<Member> getMemberById(UUID id);
+    Optional<Member> getMemberById(UUID id, UUID authenticatedUserId);
 
-    Member addMember(UUID groupId, Member member);
+    Member addMember(UUID groupId, Member member, UUID authenticatedUserId);
 
-    Optional<Member> updateMember(UUID id, Member member);
+    Optional<Member> updateMember(UUID id, Member member, UUID authenticatedUserId);
 
-    boolean deleteMember(UUID id);
+    boolean deleteMember(UUID id, UUID authenticatedUserId);
 }

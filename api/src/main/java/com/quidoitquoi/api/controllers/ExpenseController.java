@@ -39,24 +39,28 @@ public class ExpenseController {
     }
 
     @GetMapping("/groups/{groupId}/expenses")
-    @Operation(summary = "List group expenses", description = "Returns all expenses belonging to a group UUID.")
+    @Operation(summary = "List group expenses", description = "Returns expenses to an authenticated group member.")
     @ApiResponse(responseCode = "200", description = "Expenses returned")
-    public ResponseEntity<List<Expense>> getExpensesByGroupId(@PathVariable UUID groupId) {
-        return ResponseEntity.ok(expenseService.getExpensesByGroupId(groupId));
+    public ResponseEntity<List<Expense>> getExpensesByGroupId(
+            @PathVariable UUID groupId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(expenseService.getExpensesByGroupId(groupId, authenticatedUserId(jwt)));
     }
 
     @GetMapping("/expenses/{id}")
     @Operation(summary = "Get an expense", description = "Returns one expense by UUID.")
     @ApiResponse(responseCode = "200", description = "Expense returned")
     @ApiResponse(responseCode = "404", description = "Expense not found")
-    public ResponseEntity<Expense> getExpenseById(@PathVariable UUID id) {
-        Expense expense = expenseService.getExpenseById(id)
+    public ResponseEntity<Expense> getExpenseById(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        Expense expense = expenseService.getExpenseById(id, authenticatedUserId(jwt))
                 .orElseThrow(() -> new ExpenseNotFoundException(id));
         return ResponseEntity.ok(expense);
     }
 
     @PostMapping("/groups/{groupId}/expenses")
-    @Operation(summary = "Add an expense", description = "Adds a validated expense to a group.")
+    @Operation(summary = "Add an expense", description = "Adds a validated expense to a group for an authenticated group member.")
     @ApiResponse(responseCode = "201", description = "Expense created")
     @ApiResponse(responseCode = "400", description = "Request validation failed")
     @ApiResponse(responseCode = "404", description = "Group not found")
@@ -64,33 +68,40 @@ public class ExpenseController {
             @PathVariable UUID groupId,
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody Expense expense) {
-        UUID madeByUserId = UUID.fromString(jwt.getSubject());
+        UUID madeByUserId = authenticatedUserId(jwt);
         Expense createdExpense = expenseService.addExpense(groupId, expense, madeByUserId);
         return ResponseEntity.created(URI.create("/api/expenses/" + createdExpense.getId()))
                 .body(createdExpense);
     }
 
     @PutMapping("/expenses/{id}")
-    @Operation(summary = "Update an expense", description = "Updates an existing expense by UUID.")
+    @Operation(summary = "Update an expense", description = "Updates an expense for an authenticated member of its group.")
     @ApiResponse(responseCode = "200", description = "Expense updated")
     @ApiResponse(responseCode = "400", description = "Request validation failed")
     @ApiResponse(responseCode = "404", description = "Expense not found")
     public ResponseEntity<Expense> updateExpense(
             @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody Expense expense) {
-        Expense updatedExpense = expenseService.updateExpense(id, expense)
+        Expense updatedExpense = expenseService.updateExpense(id, expense, authenticatedUserId(jwt))
                 .orElseThrow(() -> new ExpenseNotFoundException(id));
         return ResponseEntity.ok(updatedExpense);
     }
 
     @DeleteMapping("/expenses/{id}")
-    @Operation(summary = "Delete an expense", description = "Deletes an expense by UUID.")
+    @Operation(summary = "Delete an expense", description = "Deletes an expense for an authenticated member of its group.")
     @ApiResponse(responseCode = "204", description = "Expense deleted")
     @ApiResponse(responseCode = "404", description = "Expense not found")
-    public ResponseEntity<Void> deleteExpense(@PathVariable UUID id) {
-        if (!expenseService.deleteExpense(id)) {
+    public ResponseEntity<Void> deleteExpense(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (!expenseService.deleteExpense(id, authenticatedUserId(jwt))) {
             throw new ExpenseNotFoundException(id);
         }
         return ResponseEntity.noContent().build();
+    }
+
+    private UUID authenticatedUserId(Jwt jwt) {
+        return UUID.fromString(jwt.getSubject());
     }
 }

@@ -15,17 +15,17 @@ import com.quidoitquoi.api.models.Settlement;
 public interface GroupService {
     int MAX_LOG_PAGE_SIZE = 10;
 
-    List<Group> getGroupsByUserId(UUID userId);
+    List<Group> getGroupsByUserId(UUID userId, UUID authenticatedUserId);
 
-    Optional<Group> getGroupById(UUID id);
+    Optional<Group> getGroupById(UUID id, UUID authenticatedUserId);
 
-    Page<GroupLogResponse> getGroupLogs(UUID groupId, int page, int size);
+    Page<GroupLogResponse> getGroupLogs(UUID groupId, int page, int size, UUID authenticatedUserId);
 
-    List<Settlement> calculateSettlements(UUID groupId);
+    List<Settlement> calculateSettlements(UUID groupId, UUID authenticatedUserId);
 
-    Group createGroup(UUID userId, Group group);
+    Group createGroup(UUID userId, Group group, UUID authenticatedUserId);
 
     Optional<Group> updateGroup(UUID id, Group group, UUID madeByUserId);
 
-    boolean deleteGroup(UUID id);
+    boolean deleteGroup(UUID id, UUID authenticatedUserId);
 }

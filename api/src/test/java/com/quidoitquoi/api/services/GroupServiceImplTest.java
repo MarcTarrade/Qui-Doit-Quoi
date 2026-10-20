@@ -1,6 +1,7 @@
 package com.quidoitquoi.api.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.quidoitquoi.api.dto.GroupLogResponse;
+import com.quidoitquoi.api.exceptions.ForbiddenOperationException;
 import com.quidoitquoi.api.models.Expense;
 import com.quidoitquoi.api.models.GroupLog;
 import com.quidoitquoi.api.models.Member;
@@ -30,6 +32,7 @@ import com.quidoitquoi.api.repository.GroupRepository;
 import com.quidoitquoi.api.repository.MemberRepository;
 import com.quidoitquoi.api.repository.UserRepository;
 import com.quidoitquoi.api.services.impl.GroupServiceImpl;
+import com.quidoitquoi.api.services.GroupAuthorizationService;
 
 class GroupServiceImplTest {
 
@@ -45,6 +48,7 @@ class GroupServiceImplTest {
     private UserRepository userRepository;
     private MemberRepository memberRepository;
     private ExpenseRepository expenseRepository;
+    private GroupAuthorizationService groupAuthorizationService;
     private GroupServiceImpl groupService;
 
     @BeforeEach
@@ -54,8 +58,14 @@ class GroupServiceImplTest {
         userRepository = mock(UserRepository.class);
         memberRepository = mock(MemberRepository.class);
         expenseRepository = mock(ExpenseRepository.class);
+        groupAuthorizationService = mock(GroupAuthorizationService.class);
         groupService = new GroupServiceImpl(
-                groupRepository, groupLogRepository, userRepository, memberRepository, expenseRepository);
+                groupRepository,
+                groupLogRepository,
+                userRepository,
+                memberRepository,
+                expenseRepository,
+                groupAuthorizationService);
     }
 
     @Test
@@ -66,9 +76,16 @@ class GroupServiceImplTest {
         when(groupRepository.findDistinctByAdmin_IdOrMembers_User_Id(ALICE_ID, ALICE_ID))
                 .thenReturn(List.of(administeredGroup, joinedGroup));
 
-        List<Group> groups = groupService.getGroupsByUserId(ALICE_ID);
+        List<Group> groups = groupService.getGroupsByUserId(ALICE_ID, ALICE_ID);
 
         assertThat(groups).containsExactly(administeredGroup, joinedGroup);
+    }
+
+    @Test
+    void getGroupsByUserIdRejectsAnotherUsersId() {
+        assertThatThrownBy(() -> groupService.getGroupsByUserId(BOB_ID, ALICE_ID))
+                .isInstanceOf(ForbiddenOperationException.class);
+        verifyNoInteractions(userRepository, groupRepository);
     }
 
     @Test
@@ -79,11 +96,11 @@ class GroupServiceImplTest {
         Expense aliceExpense = expense(6000L, alice);
         Expense bobExpense = expense(3000L, bob);
 
-        when(groupRepository.existsById(GROUP_ID)).thenReturn(true);
+        when(groupAuthorizationService.requireMember(GROUP_ID, ALICE_ID)).thenReturn(mock(Group.class));
         when(memberRepository.findByGroup_Id(GROUP_ID)).thenReturn(List.of(alice, bob, carol));
         when(expenseRepository.findByGroup_Id(GROUP_ID)).thenReturn(List.of(aliceExpense, bobExpense));
 
-        List<Settlement> settlements = groupService.calculateSettlements(GROUP_ID);
+        List<Settlement> settlements = groupService.calculateSettlements(GROUP_ID, ALICE_ID);
 
         assertThat(settlements).containsExactly(
                 new Settlement(CAROL_ID, "Carol", ALICE_ID, "Alice", 3000L));
@@ -93,7 +110,7 @@ class GroupServiceImplTest {
     void getGroupLogsReturnsPagedActivityAndCapsPageSizeAtTen() {
         GroupLog log = mock(GroupLog.class);
         User madeBy = mock(User.class);
-        when(groupRepository.existsById(GROUP_ID)).thenReturn(true);
+        when(groupAuthorizationService.requireMember(GROUP_ID, ALICE_ID)).thenReturn(mock(Group.class));
         when(groupLogRepository.findByGroup_Id(
                 org.mockito.ArgumentMatchers.eq(GROUP_ID),
                 org.mockito.ArgumentMatchers.any(Pageable.class)))
@@ -104,7 +121,7 @@ class GroupServiceImplTest {
         when(madeBy.getId()).thenReturn(ADMIN_ID);
         when(madeBy.getUsername()).thenReturn("admin");
 
-        var result = groupService.getGroupLogs(GROUP_ID, 2, 25);
+        var result = groupService.getGroupLogs(GROUP_ID, 2, 25, ALICE_ID);
 
         assertThat(result.getContent()).containsExactly(new GroupLogResponse(
                 ALICE_ID,
@@ -129,7 +146,7 @@ class GroupServiceImplTest {
         when(userRepository.findById(ADMIN_ID)).thenReturn(java.util.Optional.of(admin));
         when(groupRepository.save(group)).thenReturn(group);
 
-        Group createdGroup = groupService.createGroup(ADMIN_ID, group);
+        Group createdGroup = groupService.createGroup(ADMIN_ID, group, ADMIN_ID);
 
         assertThat(createdGroup).isSameAs(group);
         verify(group).setAdmin(admin);
@@ -145,6 +162,7 @@ class GroupServiceImplTest {
         Group existingGroup = mock(Group.class);
         Group updatedDetails = mock(Group.class);
         when(groupRepository.findById(GROUP_ID)).thenReturn(java.util.Optional.of(existingGroup));
+        when(groupAuthorizationService.requireAdmin(GROUP_ID, EDITOR_ID)).thenReturn(existingGroup);
         when(groupRepository.save(existingGroup)).thenReturn(existingGroup);
 
         Group result = groupService.updateGroup(GROUP_ID, updatedDetails, EDITOR_ID).orElseThrow();
@@ -164,6 +182,7 @@ class GroupServiceImplTest {
         Group updatedDetails = new Group("New name", "New description", "image.png", "USD", null);
         User editor = mock(User.class);
         when(groupRepository.findById(GROUP_ID)).thenReturn(java.util.Optional.of(existingGroup));
+        when(groupAuthorizationService.requireAdmin(GROUP_ID, EDITOR_ID)).thenReturn(existingGroup);
         when(groupRepository.save(existingGroup)).thenReturn(existingGroup);
         when(userRepository.findById(EDITOR_ID)).thenReturn(java.util.Optional.of(editor));
 
