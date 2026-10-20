@@ -11,7 +11,7 @@ public interface ExpenseService {
 
     Optional<Expense> getExpenseById(UUID id);
 
-    Expense addExpense(UUID groupId, Expense expense);
+    Expense addExpense(UUID groupId, Expense expense, UUID madeByUserId);
 
     Optional<Expense> updateExpense(UUID id, Expense expense);
 

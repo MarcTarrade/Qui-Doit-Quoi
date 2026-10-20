@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,8 +13,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,11 +25,13 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.quidoitquoi.api.exceptions.GroupNotFoundException;
+import com.quidoitquoi.api.dto.GroupLogResponse;
 import com.quidoitquoi.api.models.Group;
 import com.quidoitquoi.api.models.Settlement;
 import com.quidoitquoi.api.services.GroupService;
 
 @RestController
+@Validated
 @RequestMapping("/api/groups")
 @Tag(name = "Groups", description = "Shared expense group management and settlement calculations")
 @SecurityRequirement(name = "bearerAuth")
@@ -52,6 +58,20 @@ public class GroupController {
         Group group = groupService.getGroupById(id)
                 .orElseThrow(() -> new GroupNotFoundException(id));
         return ResponseEntity.ok(group);
+    }
+
+    @GetMapping("/{id}/logs")
+    @Operation(
+            summary = "List a group's activity logs",
+            description = "Returns a page of group activity logs, with a maximum of 10 entries per page.")
+    @ApiResponse(responseCode = "200", description = "Group logs returned")
+    @ApiResponse(responseCode = "400", description = "Page must be zero or greater and size must be positive")
+    @ApiResponse(responseCode = "404", description = "Group not found")
+    public ResponseEntity<Page<GroupLogResponse>> getGroupLogs(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) int size) {
+        return ResponseEntity.ok(groupService.getGroupLogs(id, page, size));
     }
 
     @GetMapping("/{id}/settlements")

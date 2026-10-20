@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.AuthenticationException;
@@ -77,6 +78,17 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ApiError> handleBadRequest(Exception exception, HttpServletRequest request) {
         return buildResponse(HttpStatus.BAD_REQUEST, "The request is invalid", request);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiError> handleConstraintViolation(
+            ConstraintViolationException exception,
+            HttpServletRequest request) {
+        String message = exception.getConstraintViolations().stream()
+                .map(violation -> violation.getMessage())
+                .distinct()
+                .collect(Collectors.joining("; "));
+        return buildResponse(HttpStatus.BAD_REQUEST, message, request);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

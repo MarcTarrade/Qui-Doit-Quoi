@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -60,8 +62,10 @@ public class ExpenseController {
     @ApiResponse(responseCode = "404", description = "Group not found")
     public ResponseEntity<Expense> addExpense(
             @PathVariable UUID groupId,
+            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody Expense expense) {
-        Expense createdExpense = expenseService.addExpense(groupId, expense);
+        UUID madeByUserId = UUID.fromString(jwt.getSubject());
+        Expense createdExpense = expenseService.addExpense(groupId, expense, madeByUserId);
         return ResponseEntity.created(URI.create("/api/expenses/" + createdExpense.getId()))
                 .body(createdExpense);
     }

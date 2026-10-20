@@ -17,14 +17,19 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 
 import com.quidoitquoi.api.exceptions.GlobalExceptionHandler;
 import com.quidoitquoi.api.models.Category;
@@ -40,6 +45,7 @@ class ExpenseControllerTest {
     private static final UUID GROUP_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID EXPENSE_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID MEMBER_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    private static final UUID USER_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
 
     @Mock
     private ExpenseService expenseService;
@@ -50,6 +56,7 @@ class ExpenseControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(new ExpenseController(expenseService))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
 
@@ -57,6 +64,11 @@ class ExpenseControllerTest {
         Group group = new Group("Trip", "Shared trip expenses", null, "EUR", user);
         Member member = new Member("John", group);
         expense = new Expense("Dinner", 4500L, Category.FOOD, member, group);
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -109,7 +121,12 @@ class ExpenseControllerTest {
 
     @Test
     void addExpenseReturnsCreatedExpenseAndLocation() throws Exception {
-        when(expenseService.addExpense(eq(GROUP_ID), any(Expense.class))).thenReturn(expense);
+        when(expenseService.addExpense(eq(GROUP_ID), any(Expense.class), eq(USER_ID))).thenReturn(expense);
+        Jwt jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "none")
+                .subject(USER_ID.toString())
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
 
         mockMvc.perform(post("/api/groups/{groupId}/expenses", GROUP_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -118,6 +135,8 @@ class ExpenseControllerTest {
                 .andExpect(header().string("Location", "/api/expenses/null"))
                 .andExpect(jsonPath("$.description").value("Dinner"))
                 .andExpect(jsonPath("$.category").value("FOOD"));
+
+        verify(expenseService).addExpense(eq(GROUP_ID), any(Expense.class), eq(USER_ID));
     }
 
     @Test
