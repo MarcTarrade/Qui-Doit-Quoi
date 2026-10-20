@@ -67,6 +67,7 @@ class GroupControllerTest {
             "Doe",
             "John");
         group = new Group("Trip", "Shared trip expenses", "https://example.com/trip.jpg", "EUR", admin);
+        authenticateAsUser();
     }
 
     @AfterEach
@@ -76,7 +77,7 @@ class GroupControllerTest {
 
     @Test
     void getGroupsByUserIdReturnsGroups() throws Exception {
-        when(groupService.getGroupsByUserId(USER_ID)).thenReturn(List.of(group));
+        when(groupService.getGroupsByUserId(USER_ID, USER_ID)).thenReturn(List.of(group));
 
         mockMvc.perform(get("/api/groups/user/{userId}", USER_ID))
                 .andExpect(status().isOk())
@@ -87,7 +88,7 @@ class GroupControllerTest {
 
     @Test
     void getGroupByIdReturnsGroup() throws Exception {
-        when(groupService.getGroupById(GROUP_ID)).thenReturn(Optional.of(group));
+        when(groupService.getGroupById(GROUP_ID, USER_ID)).thenReturn(Optional.of(group));
 
         mockMvc.perform(get("/api/groups/{id}", GROUP_ID))
                 .andExpect(status().isOk())
@@ -96,7 +97,7 @@ class GroupControllerTest {
 
     @Test
     void getGroupByIdReturnsNotFoundErrorWhenGroupDoesNotExist() throws Exception {
-        when(groupService.getGroupById(GROUP_ID)).thenReturn(Optional.empty());
+        when(groupService.getGroupById(GROUP_ID, USER_ID)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/groups/{id}", GROUP_ID))
                 .andExpect(status().isNotFound())
@@ -116,7 +117,7 @@ class GroupControllerTest {
         GroupLogResponse log = new GroupLogResponse(
                 USER_ID, "EXPENSE_ADDED", java.time.Instant.parse("2026-10-20T08:00:00Z"),
                 USER_ID, "jdoe");
-        when(groupService.getGroupLogs(GROUP_ID, 1, 10))
+        when(groupService.getGroupLogs(GROUP_ID, 1, 10, USER_ID))
                 .thenReturn(new PageImpl<>(List.of(log), PageRequest.of(1, 10), 11));
 
         mockMvc.perform(get("/api/groups/{id}/logs", GROUP_ID)
@@ -129,12 +130,12 @@ class GroupControllerTest {
                 .andExpect(jsonPath("$.size").value(10))
                 .andExpect(jsonPath("$.totalElements").value(11));
 
-        verify(groupService).getGroupLogs(GROUP_ID, 1, 10);
+        verify(groupService).getGroupLogs(GROUP_ID, 1, 10, USER_ID);
     }
 
         @Test
         void getSettlementsReturnsTransfers() throws Exception {
-        when(groupService.calculateSettlements(GROUP_ID)).thenReturn(List.of(
+        when(groupService.calculateSettlements(GROUP_ID, USER_ID)).thenReturn(List.of(
             new Settlement(USER_ID, "John", GROUP_ID, "Jane", 3000L)));
 
         mockMvc.perform(get("/api/groups/{id}/settlements", GROUP_ID))
@@ -146,7 +147,7 @@ class GroupControllerTest {
 
     @Test
     void createGroupReturnsCreatedGroupAndLocation() throws Exception {
-        when(groupService.createGroup(eq(USER_ID), any(Group.class))).thenReturn(group);
+        when(groupService.createGroup(eq(USER_ID), any(Group.class), eq(USER_ID))).thenReturn(group);
 
         mockMvc.perform(post("/api/groups/{userId}", USER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -208,17 +209,17 @@ class GroupControllerTest {
 
     @Test
     void deleteGroupReturnsNoContent() throws Exception {
-        when(groupService.deleteGroup(GROUP_ID)).thenReturn(true);
+        when(groupService.deleteGroup(GROUP_ID, USER_ID)).thenReturn(true);
 
         mockMvc.perform(delete("/api/groups/{id}", GROUP_ID))
                 .andExpect(status().isNoContent());
 
-        verify(groupService).deleteGroup(GROUP_ID);
+        verify(groupService).deleteGroup(GROUP_ID, USER_ID);
     }
 
     @Test
     void deleteGroupReturnsNotFoundErrorWhenGroupDoesNotExist() throws Exception {
-        when(groupService.deleteGroup(GROUP_ID)).thenReturn(false);
+        when(groupService.deleteGroup(GROUP_ID, USER_ID)).thenReturn(false);
 
         mockMvc.perform(delete("/api/groups/{id}", GROUP_ID))
                 .andExpect(status().isNotFound())

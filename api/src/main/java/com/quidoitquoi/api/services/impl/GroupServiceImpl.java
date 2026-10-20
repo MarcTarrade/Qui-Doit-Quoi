@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.quidoitquoi.api.dto.GroupLogResponse;
+import com.quidoitquoi.api.exceptions.ForbiddenOperationException;
 import com.quidoitquoi.api.exceptions.GroupNotFoundException;
 import com.quidoitquoi.api.exceptions.UserNotFoundException;
 import com.quidoitquoi.api.models.Group;
@@ -28,6 +29,7 @@ import com.quidoitquoi.api.repository.GroupLogRepository;
 import com.quidoitquoi.api.repository.GroupRepository;
 import com.quidoitquoi.api.repository.MemberRepository;
 import com.quidoitquoi.api.repository.UserRepository;
+import com.quidoitquoi.api.services.GroupAuthorizationService;
 import com.quidoitquoi.api.services.GroupService;
 
 @Service
@@ -38,37 +40,45 @@ public class GroupServiceImpl implements GroupService {
     private final UserRepository userRepository;
     private final MemberRepository memberRepository;
     private final ExpenseRepository expenseRepository;
+    private final GroupAuthorizationService groupAuthorizationService;
 
     public GroupServiceImpl(
             GroupRepository groupRepository,
             GroupLogRepository groupLogRepository,
             UserRepository userRepository,
             MemberRepository memberRepository,
-            ExpenseRepository expenseRepository) {
+            ExpenseRepository expenseRepository,
+            GroupAuthorizationService groupAuthorizationService) {
         this.groupRepository = groupRepository;
         this.groupLogRepository = groupLogRepository;
         this.userRepository = userRepository;
         this.memberRepository = memberRepository;
         this.expenseRepository = expenseRepository;
+        this.groupAuthorizationService = groupAuthorizationService;
     }
 
     @Override
-    public List<Group> getGroupsByUserId(UUID userId) {
+    public List<Group> getGroupsByUserId(UUID userId, UUID authenticatedUserId) {
+        if (!userId.equals(authenticatedUserId)) {
+            throw new ForbiddenOperationException();
+        }
         userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
         return groupRepository.findDistinctByAdmin_IdOrMembers_User_Id(userId, userId);
     }
 
     @Override
-    public Optional<Group> getGroupById(UUID id) {
-        return groupRepository.findById(id);
+    public Optional<Group> getGroupById(UUID id, UUID authenticatedUserId) {
+        return Optional.of(groupAuthorizationService.requireMember(id, authenticatedUserId));
     }
 
     @Override
-    public Page<GroupLogResponse> getGroupLogs(UUID groupId, int page, int size) {
-        if (!groupRepository.existsById(groupId)) {
-            throw new GroupNotFoundException(groupId);
-        }
+    public Page<GroupLogResponse> getGroupLogs(
+            UUID groupId,
+            int page,
+            int size,
+            UUID authenticatedUserId) {
+        groupAuthorizationService.requireMember(groupId, authenticatedUserId);
 
         PageRequest pageable = PageRequest.of(
                 page,
@@ -84,11 +94,8 @@ public class GroupServiceImpl implements GroupService {
     }
 
     @Override
-    public List<Settlement> calculateSettlements(UUID groupId) {
-        // Settlements can only be calculated for an existing group.
-        if (!groupRepository.existsById(groupId)) {
-            throw new GroupNotFoundException(groupId);
-        }
+    public List<Settlement> calculateSettlements(UUID groupId, UUID authenticatedUserId) {
+        groupAuthorizationService.requireMember(groupId, authenticatedUserId);
 
         List<Member> members = memberRepository.findByGroup_Id(groupId);
         if (members.isEmpty()) {
@@ -168,7 +175,10 @@ public class GroupServiceImpl implements GroupService {
     }
 
     @Override
-    public Group createGroup(UUID userId, Group group) {
+    public Group createGroup(UUID userId, Group group, UUID authenticatedUserId) {
+        if (!userId.equals(authenticatedUserId)) {
+            throw new ForbiddenOperationException();
+        }
         var admin = userRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException(userId));
         group.setAdmin(admin);
@@ -184,12 +194,7 @@ public class GroupServiceImpl implements GroupService {
     @Override
     @Transactional
     public Optional<Group> updateGroup(UUID id, Group group, UUID madeByUserId) {
-        Optional<Group> existingGroupResult = groupRepository.findById(id);
-        if (existingGroupResult.isEmpty()) {
-            return Optional.empty();
-        }
-
-        Group existingGroup = existingGroupResult.get();
+        Group existingGroup = groupAuthorizationService.requireAdmin(id, madeByUserId);
         boolean changed = !Objects.equals(existingGroup.getName(), group.getName())
                 || !Objects.equals(existingGroup.getDescription(), group.getDescription())
                 || !Objects.equals(existingGroup.getImg(), group.getImg())
@@ -211,12 +216,9 @@ public class GroupServiceImpl implements GroupService {
     }
 
     @Override
-    public boolean deleteGroup(UUID id) {
-        if (!groupRepository.existsById(id)) {
-            return false;
-        }
-
-        groupRepository.deleteById(id);
+    public boolean deleteGroup(UUID id, UUID authenticatedUserId) {
+        Group group = groupAuthorizationService.requireAdmin(id, authenticatedUserId);
+        groupRepository.delete(group);
         return true;
     }
 }

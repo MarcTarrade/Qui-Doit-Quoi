@@ -22,6 +22,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import com.quidoitquoi.api.exceptions.ForbiddenOperationException;
 import com.quidoitquoi.api.exceptions.UserNotFoundException;
 import com.quidoitquoi.api.models.User;
 import com.quidoitquoi.api.services.UserService;
@@ -38,10 +39,10 @@ public class UserController {
 	}
 
 	@GetMapping
-	@Operation(summary = "List users", description = "Returns all users.")
-	@ApiResponse(responseCode = "200", description = "Users returned")
+	@Operation(summary = "List users", description = "Listing all user profiles is not allowed.")
+	@ApiResponse(responseCode = "403", description = "Listing all user profiles is forbidden")
 	public ResponseEntity<List<User>> getAllUsers() {
-		return ResponseEntity.ok(userService.getAllUsers());
+		throw new ForbiddenOperationException();
 	}
 
 	@GetMapping("/me")
@@ -58,7 +59,10 @@ public class UserController {
 	@Operation(summary = "Get a user", description = "Returns one user by UUID.")
 	@ApiResponse(responseCode = "200", description = "User returned")
 	@ApiResponse(responseCode = "404", description = "User not found")
-	public ResponseEntity<User> getUserById(@PathVariable UUID id) {
+	public ResponseEntity<User> getUserById(
+			@PathVariable UUID id,
+			@AuthenticationPrincipal Jwt jwt) {
+		requireCurrentUser(id, jwt);
 		User user = userService.getUserById(id)
 				.orElseThrow(() -> new UserNotFoundException(id));
 		return ResponseEntity.ok(user);
@@ -79,7 +83,11 @@ public class UserController {
 	@ApiResponse(responseCode = "200", description = "User updated")
 	@ApiResponse(responseCode = "400", description = "Request validation failed")
 	@ApiResponse(responseCode = "404", description = "User not found")
-	public ResponseEntity<User> updateUser(@PathVariable UUID id, @Valid @RequestBody User user) {
+	public ResponseEntity<User> updateUser(
+			@PathVariable UUID id,
+			@AuthenticationPrincipal Jwt jwt,
+			@Valid @RequestBody User user) {
+		requireCurrentUser(id, jwt);
 		User updatedUser = userService.updateUser(id, user)
 				.orElseThrow(() -> new UserNotFoundException(id));
 		return ResponseEntity.ok(updatedUser);
@@ -89,10 +97,19 @@ public class UserController {
 	@Operation(summary = "Delete a user", description = "Deletes a user by UUID.")
 	@ApiResponse(responseCode = "204", description = "User deleted")
 	@ApiResponse(responseCode = "404", description = "User not found")
-	public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
+	public ResponseEntity<Void> deleteUser(
+			@PathVariable UUID id,
+			@AuthenticationPrincipal Jwt jwt) {
+		requireCurrentUser(id, jwt);
 		if (!userService.deleteUser(id)) {
 			throw new UserNotFoundException(id);
 		}
 		return ResponseEntity.noContent().build();
+	}
+
+	private void requireCurrentUser(UUID requestedUserId, Jwt jwt) {
+		if (!requestedUserId.equals(UUID.fromString(jwt.getSubject()))) {
+			throw new ForbiddenOperationException();
+		}
 	}
 }

@@ -64,6 +64,7 @@ class ExpenseControllerTest {
         Group group = new Group("Trip", "Shared trip expenses", null, "EUR", user);
         Member member = new Member("John", group);
         expense = new Expense("Dinner", 4500L, Category.FOOD, member, group);
+        authenticateAsUser();
     }
 
     @AfterEach
@@ -71,9 +72,17 @@ class ExpenseControllerTest {
         SecurityContextHolder.clearContext();
     }
 
+    private void authenticateAsUser() {
+        Jwt jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "none")
+                .subject(USER_ID.toString())
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+    }
+
     @Test
     void getExpensesByGroupIdReturnsExpenses() throws Exception {
-        when(expenseService.getExpensesByGroupId(GROUP_ID)).thenReturn(List.of(expense));
+        when(expenseService.getExpensesByGroupId(GROUP_ID, USER_ID)).thenReturn(List.of(expense));
 
         mockMvc.perform(get("/api/groups/{groupId}/expenses", GROUP_ID))
                 .andExpect(status().isOk())
@@ -84,7 +93,7 @@ class ExpenseControllerTest {
 
     @Test
     void getExpensesByGroupIdReturnsNotFoundWhenGroupDoesNotExist() throws Exception {
-        when(expenseService.getExpensesByGroupId(GROUP_ID))
+        when(expenseService.getExpensesByGroupId(GROUP_ID, USER_ID))
                 .thenThrow(new com.quidoitquoi.api.exceptions.GroupNotFoundException(GROUP_ID));
 
         mockMvc.perform(get("/api/groups/{groupId}/expenses", GROUP_ID))
@@ -94,7 +103,7 @@ class ExpenseControllerTest {
 
     @Test
     void getExpenseByIdReturnsExpense() throws Exception {
-        when(expenseService.getExpenseById(EXPENSE_ID)).thenReturn(Optional.of(expense));
+        when(expenseService.getExpenseById(EXPENSE_ID, USER_ID)).thenReturn(Optional.of(expense));
 
         mockMvc.perform(get("/api/expenses/{id}", EXPENSE_ID))
                 .andExpect(status().isOk())
@@ -104,7 +113,7 @@ class ExpenseControllerTest {
 
     @Test
     void getExpenseByIdReturnsNotFoundWhenExpenseDoesNotExist() throws Exception {
-        when(expenseService.getExpenseById(EXPENSE_ID)).thenReturn(Optional.empty());
+        when(expenseService.getExpenseById(EXPENSE_ID, USER_ID)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/expenses/{id}", EXPENSE_ID))
                 .andExpect(status().isNotFound())
@@ -158,7 +167,7 @@ class ExpenseControllerTest {
 
     @Test
     void updateExpenseReturnsUpdatedExpense() throws Exception {
-        when(expenseService.updateExpense(eq(EXPENSE_ID), any(Expense.class)))
+        when(expenseService.updateExpense(eq(EXPENSE_ID), any(Expense.class), eq(USER_ID)))
                 .thenReturn(Optional.of(expense));
 
         mockMvc.perform(put("/api/expenses/{id}", EXPENSE_ID)
@@ -171,7 +180,7 @@ class ExpenseControllerTest {
 
     @Test
     void updateExpenseReturnsNotFoundWhenExpenseDoesNotExist() throws Exception {
-        when(expenseService.updateExpense(eq(EXPENSE_ID), any(Expense.class)))
+        when(expenseService.updateExpense(eq(EXPENSE_ID), any(Expense.class), eq(USER_ID)))
                 .thenReturn(Optional.empty());
 
         mockMvc.perform(put("/api/expenses/{id}", EXPENSE_ID)
@@ -183,17 +192,17 @@ class ExpenseControllerTest {
 
     @Test
     void deleteExpenseReturnsNoContent() throws Exception {
-        when(expenseService.deleteExpense(EXPENSE_ID)).thenReturn(true);
+        when(expenseService.deleteExpense(EXPENSE_ID, USER_ID)).thenReturn(true);
 
         mockMvc.perform(delete("/api/expenses/{id}", EXPENSE_ID))
                 .andExpect(status().isNoContent());
 
-        verify(expenseService).deleteExpense(EXPENSE_ID);
+        verify(expenseService).deleteExpense(EXPENSE_ID, USER_ID);
     }
 
     @Test
     void deleteExpenseReturnsNotFoundWhenExpenseDoesNotExist() throws Exception {
-        when(expenseService.deleteExpense(EXPENSE_ID)).thenReturn(false);
+        when(expenseService.deleteExpense(EXPENSE_ID, USER_ID)).thenReturn(false);
 
         mockMvc.perform(delete("/api/expenses/{id}", EXPENSE_ID))
                 .andExpect(status().isNotFound())

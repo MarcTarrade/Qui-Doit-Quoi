@@ -46,18 +46,22 @@ public class GroupController {
     }
 
     @GetMapping("/user/{userId}")
-    @Operation(summary = "List a user's groups", description = "Returns every group associated with the specified user UUID.")
+    @Operation(summary = "List the authenticated user's groups", description = "Returns groups in which the authenticated user is an admin or member.")
     @ApiResponse(responseCode = "200", description = "Groups returned")
-    public ResponseEntity<List<Group>> getGroupsByUserId(@PathVariable UUID userId) {
-        return ResponseEntity.ok(groupService.getGroupsByUserId(userId));
+    public ResponseEntity<List<Group>> getGroupsByUserId(
+            @PathVariable UUID userId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(groupService.getGroupsByUserId(userId, authenticatedUserId(jwt)));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get a group", description = "Returns one group by UUID.")
+    @Operation(summary = "Get a group", description = "Returns one group by UUID to an authenticated group member.")
     @ApiResponse(responseCode = "200", description = "Group returned")
     @ApiResponse(responseCode = "404", description = "Group not found")
-    public ResponseEntity<Group> getGroupById(@PathVariable UUID id) {
-        Group group = groupService.getGroupById(id)
+    public ResponseEntity<Group> getGroupById(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        Group group = groupService.getGroupById(id, authenticatedUserId(jwt))
                 .orElseThrow(() -> new GroupNotFoundException(id));
         return ResponseEntity.ok(group);
     }
@@ -65,38 +69,44 @@ public class GroupController {
     @GetMapping("/{id}/logs")
     @Operation(
             summary = "List a group's activity logs",
-            description = "Returns a page of group activity logs, with a maximum of 10 entries per page.")
+            description = "Returns a page of group activity logs to a group member, with a maximum of 10 entries per page.")
     @ApiResponse(responseCode = "200", description = "Group logs returned")
     @ApiResponse(responseCode = "400", description = "Page must be zero or greater and size must be positive")
     @ApiResponse(responseCode = "404", description = "Group not found")
     public ResponseEntity<Page<GroupLogResponse>> getGroupLogs(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "10") @Min(1) int size) {
-        return ResponseEntity.ok(groupService.getGroupLogs(id, page, size));
+            @RequestParam(defaultValue = "10") @Min(1) int size,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(groupService.getGroupLogs(id, page, size, authenticatedUserId(jwt)));
     }
 
     @GetMapping("/{id}/settlements")
-    @Operation(summary = "Calculate settlements", description = "Calculates the transfers needed to settle the group's shared expenses.")
+    @Operation(summary = "Calculate settlements", description = "Calculates transfers for an authenticated group member.")
     @ApiResponse(responseCode = "200", description = "Settlement transfers returned")
     @ApiResponse(responseCode = "404", description = "Group not found")
-    public ResponseEntity<List<Settlement>> getSettlements(@PathVariable UUID id) {
-        return ResponseEntity.ok(groupService.calculateSettlements(id));
+    public ResponseEntity<List<Settlement>> getSettlements(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(groupService.calculateSettlements(id, authenticatedUserId(jwt)));
     }
 
     @PostMapping("/{userId}")
-    @Operation(summary = "Create a group", description = "Creates a group owned by the specified user UUID.")
+    @Operation(summary = "Create a group", description = "Creates a group owned by the authenticated user.")
     @ApiResponse(responseCode = "201", description = "Group created")
     @ApiResponse(responseCode = "400", description = "Request validation failed")
     @ApiResponse(responseCode = "404", description = "User not found")
-    public ResponseEntity<Group> createGroup(@PathVariable UUID userId, @Valid @RequestBody Group group) {
-        Group createdGroup = groupService.createGroup(userId, group);
+    public ResponseEntity<Group> createGroup(
+            @PathVariable UUID userId,
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody Group group) {
+        Group createdGroup = groupService.createGroup(userId, group, authenticatedUserId(jwt));
         return ResponseEntity.created(URI.create("/api/groups/" + createdGroup.getId()))
                 .body(createdGroup);
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update a group", description = "Updates an existing group by UUID.")
+    @Operation(summary = "Update a group", description = "Updates an existing group by UUID. Only its admin may update it.")
     @ApiResponse(responseCode = "200", description = "Group updated")
     @ApiResponse(responseCode = "400", description = "Request validation failed")
     @ApiResponse(responseCode = "404", description = "Group not found")
@@ -104,20 +114,26 @@ public class GroupController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody Group group) {
-        UUID madeByUserId = UUID.fromString(jwt.getSubject());
+        UUID madeByUserId = authenticatedUserId(jwt);
         Group updatedGroup = groupService.updateGroup(id, group, madeByUserId)
                 .orElseThrow(() -> new GroupNotFoundException(id));
         return ResponseEntity.ok(updatedGroup);
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a group", description = "Deletes a group by UUID.")
+    @Operation(summary = "Delete a group", description = "Deletes a group by UUID. Only its admin may delete it.")
     @ApiResponse(responseCode = "204", description = "Group deleted")
     @ApiResponse(responseCode = "404", description = "Group not found")
-    public ResponseEntity<Void> deleteGroup(@PathVariable UUID id) {
-        if (!groupService.deleteGroup(id)) {
+    public ResponseEntity<Void> deleteGroup(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (!groupService.deleteGroup(id, authenticatedUserId(jwt))) {
             throw new GroupNotFoundException(id);
         }
         return ResponseEntity.noContent().build();
+    }
+
+    private UUID authenticatedUserId(Jwt jwt) {
+        return UUID.fromString(jwt.getSubject());
     }
 }
