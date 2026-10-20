@@ -283,7 +283,7 @@ export default function GroupDetailPage() {
         >
           <Image alt="" height={32} src="/group-detail/back-mobile.svg" width={32} />
         </Link>
-        <h1>{group?.name ?? (loadState === "loading" ? "Loading group…" : "Group details")}</h1>
+        <h1>{group?.name}</h1>
         <Link
           aria-label="Group settings"
           className="group-detail__settings-link"
