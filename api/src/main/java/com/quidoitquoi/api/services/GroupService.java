@@ -25,7 +25,7 @@ public interface GroupService {
 
     Group createGroup(UUID userId, Group group);
 
-    Optional<Group> updateGroup(UUID id, Group group);
+    Optional<Group> updateGroup(UUID id, Group group, UUID madeByUserId);
 
     boolean deleteGroup(UUID id);
 }

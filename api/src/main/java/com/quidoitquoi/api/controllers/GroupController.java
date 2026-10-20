@@ -6,6 +6,8 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -98,8 +100,12 @@ public class GroupController {
     @ApiResponse(responseCode = "200", description = "Group updated")
     @ApiResponse(responseCode = "400", description = "Request validation failed")
     @ApiResponse(responseCode = "404", description = "Group not found")
-    public ResponseEntity<Group> updateGroup(@PathVariable UUID id, @Valid @RequestBody Group group) {
-        Group updatedGroup = groupService.updateGroup(id, group)
+    public ResponseEntity<Group> updateGroup(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody Group group) {
+        UUID madeByUserId = UUID.fromString(jwt.getSubject());
+        Group updatedGroup = groupService.updateGroup(id, group, madeByUserId)
                 .orElseThrow(() -> new GroupNotFoundException(id));
         return ResponseEntity.ok(updatedGroup);
     }

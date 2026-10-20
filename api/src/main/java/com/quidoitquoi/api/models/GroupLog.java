@@ -21,6 +21,7 @@ import jakarta.persistence.Table;
 public class GroupLog {
 
     public static final String EXPENSE_ADDED = "EXPENSE_ADDED";
+    public static final String GROUP_UPDATED = "GROUP_UPDATED";
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

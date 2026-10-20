@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -52,6 +57,7 @@ class GroupControllerTest {
     void setUp() {
         GroupController groupController = new GroupController(groupService);
         mockMvc = MockMvcBuilders.standaloneSetup(groupController)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
         admin = new User(
@@ -61,6 +67,11 @@ class GroupControllerTest {
             "Doe",
             "John");
         group = new Group("Trip", "Shared trip expenses", "https://example.com/trip.jpg", "EUR", admin);
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -165,7 +176,8 @@ class GroupControllerTest {
 
     @Test
     void updateGroupReturnsUpdatedGroup() throws Exception {
-        when(groupService.updateGroup(eq(GROUP_ID), any(Group.class))).thenReturn(Optional.of(group));
+        when(groupService.updateGroup(eq(GROUP_ID), any(Group.class), eq(USER_ID))).thenReturn(Optional.of(group));
+        authenticateAsUser();
 
         mockMvc.perform(put("/api/groups/{id}", GROUP_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -176,13 +188,22 @@ class GroupControllerTest {
 
     @Test
     void updateGroupReturnsNotFoundErrorWhenGroupDoesNotExist() throws Exception {
-        when(groupService.updateGroup(eq(GROUP_ID), any(Group.class))).thenReturn(Optional.empty());
+        when(groupService.updateGroup(eq(GROUP_ID), any(Group.class), eq(USER_ID))).thenReturn(Optional.empty());
+        authenticateAsUser();
 
         mockMvc.perform(put("/api/groups/{id}", GROUP_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(groupJson()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
+    }
+
+    private void authenticateAsUser() {
+        Jwt jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "none")
+                .subject(USER_ID.toString())
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
     }
 
     @Test

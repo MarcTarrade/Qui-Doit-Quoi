@@ -5,6 +5,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -37,6 +38,7 @@ class GroupServiceImplTest {
     private static final UUID BOB_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     private static final UUID CAROL_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID ADMIN_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    private static final UUID EDITOR_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
 
     private GroupRepository groupRepository;
     private GroupLogRepository groupLogRepository;
@@ -145,7 +147,7 @@ class GroupServiceImplTest {
         when(groupRepository.findById(GROUP_ID)).thenReturn(java.util.Optional.of(existingGroup));
         when(groupRepository.save(existingGroup)).thenReturn(existingGroup);
 
-        Group result = groupService.updateGroup(GROUP_ID, updatedDetails).orElseThrow();
+        Group result = groupService.updateGroup(GROUP_ID, updatedDetails, EDITOR_ID).orElseThrow();
 
         assertThat(result).isSameAs(existingGroup);
         verify(existingGroup).setName(updatedDetails.getName());
@@ -153,6 +155,30 @@ class GroupServiceImplTest {
         verify(existingGroup).setImg(updatedDetails.getImg());
         verify(existingGroup).setCurrency(updatedDetails.getCurrency());
         verify(existingGroup, never()).setAdmin(any(User.class));
+        verifyNoInteractions(groupLogRepository);
+    }
+
+    @Test
+    void updateGroupWritesLogForChangedParametersAndAuthenticatedUser() {
+        Group existingGroup = new Group("Old name", "Old description", null, "EUR", null);
+        Group updatedDetails = new Group("New name", "New description", "image.png", "USD", null);
+        User editor = mock(User.class);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(java.util.Optional.of(existingGroup));
+        when(groupRepository.save(existingGroup)).thenReturn(existingGroup);
+        when(userRepository.findById(EDITOR_ID)).thenReturn(java.util.Optional.of(editor));
+
+        Group result = groupService.updateGroup(GROUP_ID, updatedDetails, EDITOR_ID).orElseThrow();
+
+        assertThat(result).isSameAs(existingGroup);
+        assertThat(result.getName()).isEqualTo("New name");
+        assertThat(result.getDescription()).isEqualTo("New description");
+        assertThat(result.getImg()).isEqualTo("image.png");
+        assertThat(result.getCurrency()).isEqualTo("USD");
+        ArgumentCaptor<GroupLog> logCaptor = ArgumentCaptor.forClass(GroupLog.class);
+        verify(groupLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getType()).isEqualTo(GroupLog.GROUP_UPDATED);
+        assertThat(logCaptor.getValue().getGroup()).isSameAs(existingGroup);
+        assertThat(logCaptor.getValue().getMadeBy()).isSameAs(editor);
     }
 
     private Member member(UUID id, String name) {
