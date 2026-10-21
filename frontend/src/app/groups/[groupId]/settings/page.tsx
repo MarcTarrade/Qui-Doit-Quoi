@@ -358,11 +358,11 @@ export default function GroupSettingsPage() {
                 </label>
               </div>
               <div className="group-settings__save">
-                {settingsError && <p className="group-detail__form-error" role="alert">{settingsError}</p>}
-                {settingsMessage && <p className="group-settings__success" role="status">{settingsMessage}</p>}
                 <button className="group-detail__form-submit" disabled={saving} type="submit">
                   {saving ? "Saving…" : "Save changes"}
                 </button>
+                {settingsError && <p className="group-detail__form-error" role="alert">{settingsError}</p>}
+                {settingsMessage && <p className="group-settings__success" role="status">{settingsMessage}</p>}
               </div>
             </form>
 

@@ -528,8 +528,12 @@ test("group settings update details and support add, cancel, and remove member a
   const imageUrlInput = page.getByRole("textbox", { name: "Image URL" });
   await expect(imageUrlInput).toBeFocused();
   await imageUrlInput.fill("https://example.test/trip.png");
-  await page.getByRole("button", { name: "Save changes" }).click();
+  const saveButton = page.getByRole("button", { name: "Save changes" });
+  const saveButtonX = (await saveButton.boundingBox())?.x;
+  expect(saveButtonX).toBeDefined();
+  await saveButton.click();
   await expect(page.getByText("Group settings saved.")).toBeVisible();
+  expect((await saveButton.boundingBox())?.x).toBe(saveButtonX);
   await expect(page.getByRole("heading", { name: "Updated trip" })).toBeVisible();
   expect(api.writes.find((write) => write.method === "PUT")?.body).toEqual({
     name: "Updated trip",
