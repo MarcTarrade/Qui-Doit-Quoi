@@ -391,6 +391,7 @@
   display: block;
   flex: none;
   border-radius: 50%;
+  object-fit: cover;
 }
 
 .home-group-card__avatar--mobile {
