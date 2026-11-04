@@ -1,8 +1,9 @@
-const currencyNames = new Intl.DisplayNames(["en"], { type: "currency" });
+export const currencyCodes = Intl.supportedValuesOf("currency").sort();
 
-export const currencies = Intl.supportedValuesOf("currency")
-  .sort()
-  .map((code) => ({
+export function getCurrencies(locale: string) {
+  const currencyNames = new Intl.DisplayNames([locale], { type: "currency" });
+  return currencyCodes.map((code) => ({
     code,
     label: `${code} — ${currencyNames.of(code) ?? code}`,
   }));
+}

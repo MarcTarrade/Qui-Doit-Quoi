@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
 import GroupSectionNav from "@/components/groups/GroupSectionNav";
@@ -62,8 +63,8 @@ function parseSettlements(value: unknown): Settlement[] {
   });
 }
 
-function formatAmount(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-GB", {
+function formatAmount(amount: number, currency: string, locale: string) {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
   }).format(amount / 100);
@@ -71,6 +72,10 @@ function formatAmount(amount: number, currency: string) {
 
 export default function GroupBalancesPage() {
   const { groupId } = useParams<{ groupId: string }>();
+  const locale = useLocale();
+  const t = useTranslations("Balances");
+  const commonT = useTranslations("Common");
+  const errorsT = useTranslations("Errors");
   const [group, setGroup] = useState<Group | null>(null);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -103,16 +108,12 @@ export default function GroupBalancesPage() {
         ]);
 
         if (!groupResponse.ok) {
-          throw new Error(
-            groupResponse.status === 404
-              ? "This group could not be found."
-              : `Unable to load group details (${groupResponse.status}).`,
-          );
+          throw new Error(groupResponse.status === 404
+            ? errorsT("groupNotFound")
+            : errorsT("loadGroupDetails", { status: groupResponse.status }));
         }
         if (!settlementsResponse.ok) {
-          throw new Error(
-            `Unable to load group balances (${settlementsResponse.status}).`,
-          );
+          throw new Error(t("loadFailed", { status: settlementsResponse.status }));
         }
 
         const [loadedGroup, loadedSettlements] = await Promise.all([
@@ -128,7 +129,12 @@ export default function GroupBalancesPage() {
       } catch (error) {
         if (controller.signal.aborted) return;
         setLoadError(
-          error instanceof Error ? error.message : "An unexpected error occurred.",
+          error instanceof Error &&
+          !error.message.startsWith("The API returned") &&
+          error.name !== "TypeError" &&
+          error.name !== "SyntaxError"
+            ? error.message
+            : commonT("unexpectedError"),
         );
         setLoadState("error");
       }
@@ -136,13 +142,13 @@ export default function GroupBalancesPage() {
 
     void loadBalances();
     return () => controller.abort();
-  }, [groupId, refreshKey]);
+  }, [commonT, errorsT, groupId, refreshKey, t]);
 
   return (
     <main className="group-detail">
       <header className="group-detail__header">
         <Link
-          aria-label="Back to groups"
+          aria-label={commonT("backToGroups")}
           className="group-detail__back"
           href="/"
         >
@@ -150,7 +156,7 @@ export default function GroupBalancesPage() {
         </Link>
         <h1>{group?.name}</h1>
         <Link
-          aria-label="Group settings"
+          aria-label={commonT("groupSettings")}
           className="group-detail__settings-link"
           href={`/groups/${encodeURIComponent(groupId)}/settings`}
         >
@@ -162,19 +168,19 @@ export default function GroupBalancesPage() {
 
       <section aria-labelledby="balances-title" className="group-detail__content">
         {loadState === "loading" && (
-          <p className="group-detail__status" role="status">Loading balances…</p>
+          <p className="group-detail__status" role="status">{t("loading")}</p>
         )}
         {loadState === "error" && (
           <div className="group-detail__message" role="alert">
             <p>{loadError}</p>
-            <button onClick={retry} type="button">Try again</button>
+            <button onClick={retry} type="button">{commonT("tryAgain")}</button>
           </div>
         )}
         {loadState === "ready" && group && (
           <div className="group-balances">
-            <h2 id="balances-title">Debt breakdown</h2>
+            <h2 id="balances-title">{t("title")}</h2>
             {settlements.length === 0 ? (
-              <p className="group-balances__empty">Everyone is settled up.</p>
+              <p className="group-balances__empty">{t("settled")}</p>
             ) : (
               <ul className="group-balances__list">
                 {settlements.map((settlement, index) => (
@@ -183,9 +189,12 @@ export default function GroupBalancesPage() {
                     key={`${settlement.fromMemberName}-${settlement.toMemberName}-${index}`}
                   >
                     <span>
-                      {settlement.fromMemberName} owes {settlement.toMemberName}
+                      {t("owes", {
+                        debtor: settlement.fromMemberName,
+                        creditor: settlement.toMemberName,
+                      })}
                     </span>
-                    <strong>{formatAmount(settlement.amount, group.currency)}</strong>
+                    <strong>{formatAmount(settlement.amount, group.currency, locale)}</strong>
                   </li>
                 ))}
               </ul>

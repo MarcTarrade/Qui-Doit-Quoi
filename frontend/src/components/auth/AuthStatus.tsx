@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import { apiRequest, apiRequestWithCsrf } from "@/lib/api";
@@ -24,6 +24,8 @@ function isAuthUser(value: unknown): value is AuthUser {
 
 export default function AuthStatus({ onUserChange }: AuthStatusProps) {
   const router = useRouter();
+  const t = useTranslations("Landing.auth");
+  const commonT = useTranslations("Common");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -61,7 +63,7 @@ export default function AuthStatus({ onUserChange }: AuthStatusProps) {
     try {
       const response = await apiRequestWithCsrf("/api/auth/logout", { method: "POST" });
       if (!response.ok) {
-        throw new Error(`Sign out failed (${response.status}).`);
+        throw new Error(t("signOutFailed", { status: response.status }));
       }
       setUser(null);
       onUserChangeRef.current?.(null);
@@ -69,7 +71,9 @@ export default function AuthStatus({ onUserChange }: AuthStatusProps) {
       router.refresh();
     } catch (signOutError) {
       setError(
-        signOutError instanceof Error ? signOutError.message : "An unexpected error occurred.",
+        signOutError instanceof Error && signOutError.name !== "TypeError"
+          ? signOutError.message
+          : commonT("unexpectedError"),
       );
     } finally {
       setIsSigningOut(false);
@@ -79,7 +83,7 @@ export default function AuthStatus({ onUserChange }: AuthStatusProps) {
   return (
     <div className="site-header__account">
       {isLoading ? (
-        <span aria-label="Loading account" className="auth-account-loading" />
+        <span aria-label={t("loadingAccount")} className="auth-account-loading" />
       ) : user ? (
         <>
           <span className="site-header__identity">
@@ -94,13 +98,13 @@ export default function AuthStatus({ onUserChange }: AuthStatusProps) {
             onClick={signOut}
             type="button"
           >
-            {isSigningOut ? "Signing out…" : "Sign out"}
+            {isSigningOut ? t("signingOut") : t("signOut")}
           </button>
         </>
       ) : (
         <>
-          <Link className="site-header__signin" href="/login">Sign in</Link>
-          <Link className="site-header__signup" href="/signup">Sign up</Link>
+          <Link className="site-header__signin" href="/login">{t("signIn")}</Link>
+          <Link className="site-header__signup" href="/signup">{t("signUp")}</Link>
         </>
       )}
       {error && <p className="site-header__error" role="alert">{error}</p>}
