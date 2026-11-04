@@ -10,8 +10,6 @@ import {
   apiImageUrl,
   apiRequest,
   apiRequestWithCsrf,
-  apiUrl,
-  checkApiConnection,
 } from "@/lib/api";
 import { currencies } from "@/lib/currencies";
 
@@ -30,7 +28,6 @@ type GroupRecord = {
 };
 
 type LoadState = "idle" | "loading" | "ready" | "error";
-type ApiStatus = "checking" | "online" | "offline";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -80,15 +77,8 @@ export default function Home() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
-  const [apiStatus, setApiStatus] = useState<ApiStatus>("checking");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const groupUserId = user?.id ?? "";
-
-  useEffect(() => {
-    checkApiConnection()
-      .then((connected) => setApiStatus(connected ? "online" : "offline"))
-      .catch(() => setApiStatus("offline"));
-  }, []);
 
   const handleUserChange = useCallback((nextUser: AuthUser | null) => {
     if (user?.id !== nextUser?.id) {
@@ -330,33 +320,33 @@ export default function Home() {
           )}
         </>
       ) : (
-        <>
-          <section className="home-landing">
-            <div>
-              <p className="home-landing__eyebrow">Shared expenses, made clear</p>
-              <h1>Keep the group math human.</h1>
-              <p className="home-landing__description">
-                Your workspace is ready for groups, members, expenses, and simple settlements.
-              </p>
-            </div>
+        <div className="home-landing">
+          <section aria-labelledby="landing-title" className="home-landing__intro">
+            <p className="home-landing__eyebrow">Shared expenses, made simple</p>
+            <h1 id="landing-title">Keep shared expenses clear and fair.</h1>
+            <p className="home-landing__description">
+              Organize group expenses, track balances, and see who owes what —
+              all in one place.
+            </p>
+            <Link className="home-landing__primary-action" href="/signup">
+              Get started
+            </Link>
+          </section>
 
-            <div className="home-landing__api">
-              <p>API connection</p>
-              <div className="home-landing__api-status">
-                <span className={`home-landing__status-dot home-landing__status-dot--${apiStatus}`} />
-                <span>
-                  {apiStatus === "checking" ? "Checking backend" : apiStatus === "online" ? "Backend online" : "Backend unavailable"}
-                </span>
-              </div>
-              <code>{apiUrl}</code>
-            </div>
+          <section aria-labelledby="how-it-works" className="home-landing__steps">
+            <h2 id="how-it-works">How it works</h2>
+            <ol>
+              <li><strong>Create a group</strong><span>Set up a trip, household, or shared event.</span></li>
+              <li><strong>Add expenses</strong><span>Record the amount and who paid.</span></li>
+              <li><strong>Settle balances</strong><span>See what each person owes at a glance.</span></li>
+            </ol>
           </section>
 
           <footer className="home-landing__footer">
-            <span>React + Next.js</span>
-            <span>Connected to the Qui-Doit-Quoi API</span>
+            <span>Qui doit quoi</span>
+            <span>Simple, transparent expense sharing.</span>
           </footer>
-        </>
+        </div>
       )}
     </main>
   );
