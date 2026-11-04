@@ -110,7 +110,7 @@
   box-sizing: border-box;
   display: grid;
   min-height: 5rem;
-  grid-template-columns: 2.5rem minmax(0, 1fr) auto auto;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto auto auto;
   align-items: center;
   column-gap: 1rem;
   padding: 0.75rem 1rem;
@@ -167,6 +167,29 @@
   font-weight: 700;
   text-align: right;
   white-space: nowrap;
+}
+
+.group-expense-card__edit {
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--grey-200);
+  border-radius: 0.5rem;
+  background: white;
+  color: var(--grey-700);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.group-expense-card__edit:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.group-expense-card__edit:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .group-expense-card__category-icon {
@@ -267,9 +290,12 @@
 }
 
 .group-detail__dialog {
+  position: fixed;
+  inset: 0;
   width: min(calc(100% - 2rem), 30rem);
   max-width: none;
   max-height: calc(100% - 2rem);
+  margin: auto;
   padding: 0;
   overflow: auto;
   border: 1px solid var(--grey-100);
@@ -806,8 +832,8 @@
 
   .group-expense-card {
     min-height: 3.4375rem;
-    grid-template-columns: 2rem minmax(0, 1fr) auto;
-    column-gap: 0.3125rem;
+    grid-template-columns: 2rem minmax(0, 1fr) auto auto;
+    column-gap: 0.5rem;
     padding: 0.5rem 0.625rem;
     border-radius: 0.9375rem;
   }
@@ -831,7 +857,13 @@
 
   .group-expense-card__amount {
     min-width: auto;
-    font-size: 1.25rem;
+    font-size: 1rem;
+  }
+
+  .group-expense-card__edit {
+    min-height: 2rem;
+    padding: 0 0.5rem;
+    font-size: 0.75rem;
   }
 
   .group-expense-card__category-icon {
