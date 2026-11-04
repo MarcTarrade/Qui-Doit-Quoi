@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Comparator;
 import java.io.IOException;
 
 import org.slf4j.Logger;
@@ -109,7 +110,9 @@ public class GroupServiceImpl implements GroupService {
     public List<Settlement> calculateSettlements(UUID groupId, UUID authenticatedUserId) {
         groupAuthorizationService.requireMember(groupId, authenticatedUserId);
 
-        List<Member> members = memberRepository.findByGroup_Id(groupId);
+        List<Member> members = memberRepository.findByGroup_Id(groupId).stream()
+                .sorted(Comparator.comparing(Member::getId))
+                .toList();
         if (members.isEmpty()) {
             return List.of();
         }
@@ -123,26 +126,33 @@ public class GroupServiceImpl implements GroupService {
             membersById.put(member.getId(), member);
         }
 
-        // Sum expenses by payer. Expenses with no valid payer are ignored.
-        long total = 0L;
+        // Credit each payer and charge each selected participant their equal share.
         for (Expense expense : expenseRepository.findByGroup_Id(groupId)) {
             if (expense.getAmount() == null || expense.getPaidBy() == null || !balances.containsKey(expense.getPaidBy().getId())) {
                 continue;
             }
-            total += expense.getAmount();
             UUID payerId = expense.getPaidBy().getId();
             balances.put(payerId, balances.get(payerId) + expense.getAmount());
-        }
 
-        // Every member pays an equal share of the total expenses.
-        // When the division has a remainder, the first members receive one
-        // extra smallest currency unit so that all amounts still balance.
-        long equalShare = total / members.size();
-        long remainder = total % members.size();
-        for (int index = 0; index < members.size(); index++) {
-            UUID memberId = members.get(index).getId();
-            long share = equalShare + (index < remainder ? 1 : 0);
-            balances.put(memberId, balances.get(memberId) - share);
+            List<Member> participants = expense.getParticipants();
+            if (participants == null || participants.isEmpty()) {
+                participants = members;
+            } else {
+                participants = participants.stream()
+                        .filter(member -> member != null && balances.containsKey(member.getId()))
+                        .sorted(Comparator.comparing(Member::getId))
+                        .toList();
+            }
+            if (participants.isEmpty()) {
+                continue;
+            }
+            long equalShare = expense.getAmount() / participants.size();
+            long remainder = expense.getAmount() % participants.size();
+            for (int index = 0; index < participants.size(); index++) {
+                UUID memberId = participants.get(index).getId();
+                long share = equalShare + (index < remainder ? 1 : 0);
+                balances.put(memberId, balances.get(memberId) - share);
+            }
         }
 
         // Convert net balances into separate lists of people who owe money

@@ -113,6 +113,25 @@ class GroupServiceImplTest {
     }
 
     @Test
+    void calculateSettlementsSplitsEachExpenseAmongItsSelectedMembers() {
+        Member alice = member(ALICE_ID, "Alice");
+        Member bob = member(BOB_ID, "Bob");
+        Member carol = member(CAROL_ID, "Carol");
+        Expense expense = expense(101L, alice);
+        when(expense.getParticipants()).thenReturn(List.of(bob, carol));
+
+        when(groupAuthorizationService.requireMember(GROUP_ID, ALICE_ID)).thenReturn(mock(Group.class));
+        when(memberRepository.findByGroup_Id(GROUP_ID)).thenReturn(List.of(alice, bob, carol));
+        when(expenseRepository.findByGroup_Id(GROUP_ID)).thenReturn(List.of(expense));
+
+        List<Settlement> settlements = groupService.calculateSettlements(GROUP_ID, ALICE_ID);
+
+        assertThat(settlements).containsExactly(
+                new Settlement(BOB_ID, "Bob", ALICE_ID, "Alice", 51L),
+                new Settlement(CAROL_ID, "Carol", ALICE_ID, "Alice", 50L));
+    }
+
+    @Test
     void getGroupLogsReturnsPagedActivityAndCapsPageSizeAtTen() {
         GroupLog log = mock(GroupLog.class);
         User madeBy = mock(User.class);

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +68,7 @@ class ExpenseServiceImplTest {
         User madeBy = mock(User.class);
         Expense expense = new Expense("Dinner", 4500L, Category.FOOD, payer, null);
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(payer));
+        when(memberRepository.findByGroup_Id(GROUP_ID)).thenReturn(List.of(payer));
         when(payer.getId()).thenReturn(MEMBER_ID);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(madeBy));
         when(expenseRepository.save(expense)).thenReturn(expense);
@@ -85,6 +87,49 @@ class ExpenseServiceImplTest {
         InOrder persistenceOrder = inOrder(expenseRepository, groupLogRepository);
         persistenceOrder.verify(expenseRepository).save(expense);
         persistenceOrder.verify(groupLogRepository).save(any(GroupLog.class));
+    }
+
+    @Test
+    void addExpenseResolvesSelectedParticipantsFromTheSameGroup() {
+        Group group = mock(Group.class);
+        Member payer = mock(Member.class);
+        Member selectedMember = mock(Member.class);
+        Member requestedMember = mock(Member.class);
+        when(groupAuthorizationService.requireMember(GROUP_ID, USER_ID)).thenReturn(group);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(mock(User.class)));
+        when(payer.getId()).thenReturn(MEMBER_ID);
+        when(payer.getGroup()).thenReturn(group);
+        when(group.getId()).thenReturn(GROUP_ID);
+        UUID selectedMemberId = UUID.fromString("44444444-4444-4444-4444-444444444444");
+        when(requestedMember.getId()).thenReturn(selectedMemberId);
+        when(selectedMember.getId()).thenReturn(selectedMemberId);
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(payer));
+        when(memberRepository.findByGroup_Id(GROUP_ID)).thenReturn(List.of(selectedMember, payer));
+        Expense expense = new Expense("Dinner", 4500L, Category.FOOD, payer, null);
+        expense.setParticipants(List.of(requestedMember));
+        when(expenseRepository.save(expense)).thenReturn(expense);
+
+        expenseService.addExpense(GROUP_ID, expense, USER_ID);
+
+        assertThat(expense.getParticipants()).containsExactly(selectedMember);
+    }
+
+    @Test
+    void addExpenseRejectsEmptyParticipantList() {
+        Group group = mock(Group.class);
+        Member payer = mock(Member.class);
+        when(groupAuthorizationService.requireMember(GROUP_ID, USER_ID)).thenReturn(group);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(mock(User.class)));
+        when(payer.getId()).thenReturn(MEMBER_ID);
+        when(payer.getGroup()).thenReturn(group);
+        when(group.getId()).thenReturn(GROUP_ID);
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(payer));
+        Expense expense = new Expense("Dinner", 4500L, Category.FOOD, payer, null);
+        expense.setParticipants(List.of());
+
+        assertThatThrownBy(() -> expenseService.addExpense(GROUP_ID, expense, USER_ID))
+                .isInstanceOf(com.quidoitquoi.api.exceptions.InvalidExpenseParticipantsException.class);
+        verify(expenseRepository, org.mockito.Mockito.never()).save(expense);
     }
 
     @Test

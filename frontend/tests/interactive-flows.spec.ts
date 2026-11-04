@@ -22,6 +22,7 @@ type ApiExpense = {
   amount: number;
   category: "FOOD" | "TRANSPORT" | "HOUSING" | "ENTERTAINMENT";
   paidBy: ApiMember | null;
+  participants?: ApiMember[] | null;
   createdAt: string;
 };
 
@@ -322,6 +323,7 @@ class MockApi {
           amount: Number(body.amount),
           category: body.category as ApiExpense["category"],
           paidBy: payer ?? null,
+          participants: this.resolveParticipants(groupId, body.participants),
         });
         await this.fulfill(route, expense);
         return;
@@ -357,6 +359,7 @@ class MockApi {
           amount: Number(body.amount),
           category: body.category as ApiExpense["category"],
           paidBy: payer ?? { id: payerId, name: "Unknown" },
+          participants: this.resolveParticipants(groupId, body.participants),
           createdAt: "2026-10-19T10:00:00Z",
         };
         groupExpenses.push(expense);
@@ -398,13 +401,24 @@ class MockApi {
     };
   }
 
+  private resolveParticipants(groupId: string, value: unknown): ApiMember[] {
+    if (!Array.isArray(value)) return structuredClone(this.members.get(groupId) ?? []);
+    const participantIds = value.flatMap((item) =>
+      typeof item === "object" && item !== null && "id" in item
+        ? [String(item.id)]
+        : [],
+    );
+    return (this.members.get(groupId) ?? []).filter((member) =>
+      participantIds.includes(member.id),
+    );
+  }
+
   private calculateSettlements(groupId: string) {
     const groupMembers = this.members.get(groupId) ?? [];
     const groupExpenses = this.expenses.get(groupId) ?? [];
     if (groupMembers.length === 0) return [];
 
     const balances = new Map(groupMembers.map((member) => [member.id, 0]));
-    const total = groupExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     for (const expense of groupExpenses) {
       if (expense.paidBy && balances.has(expense.paidBy.id)) {
         balances.set(
@@ -412,17 +426,23 @@ class MockApi {
           (balances.get(expense.paidBy.id) ?? 0) + expense.amount,
         );
       }
+      const participants =
+        expense.participants?.length
+          ? groupMembers.filter((member) =>
+              expense.participants?.some((participant) => participant.id === member.id),
+            )
+          : groupMembers;
+      const equalShare = Math.floor(expense.amount / participants.length);
+      const remainder = expense.amount % participants.length;
+      participants.forEach((member, index) => {
+        balances.set(
+          member.id,
+          (balances.get(member.id) ?? 0) -
+            equalShare -
+            (index < remainder ? 1 : 0),
+        );
+      });
     }
-    const equalShare = Math.floor(total / groupMembers.length);
-    const remainder = total % groupMembers.length;
-    groupMembers.forEach((member, index) => {
-      balances.set(
-        member.id,
-        (balances.get(member.id) ?? 0) -
-          equalShare -
-          (index < remainder ? 1 : 0),
-      );
-    });
 
     const debtors = groupMembers
       .map((member) => ({ member, amount: -(balances.get(member.id) ?? 0) }))
@@ -573,6 +593,7 @@ test("French translations are used across authentication and group pages", async
       amount: 2400,
       category: "TRANSPORT",
       paidBy: { id: "member-marc", name: "Marc" },
+      participants: [],
       createdAt: "2026-09-21T10:20:00Z",
     }],
     activityLogs: [{
@@ -605,6 +626,12 @@ test("French translations are used across authentication and group pages", async
   await expect(page.getByRole("navigation", { name: "Sections du groupe" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ajouter une dépense" })).toBeVisible();
   await expect(page.getByText("Payé par Marc")).toBeVisible();
+  await page.getByRole("button", { name: "Modifier Train tickets" }).click();
+  const legacyParticipants = page.locator('input[name="participants"]');
+  await expect(legacyParticipants).toHaveCount(2);
+  await expect(legacyParticipants.nth(0)).toBeChecked();
+  await expect(legacyParticipants.nth(1)).toBeChecked();
+  await page.getByRole("button", { name: "Retour au groupe" }).click();
 
   await page.getByRole("link", { name: "Soldes" }).click();
   await expect(page.getByRole("heading", { name: "Détail des dettes" })).toBeVisible();
@@ -687,6 +714,10 @@ test("creates a group, adds an expense, and displays the calculated balance", as
   await expect(page.getByLabel("Description")).toHaveValue("Ski passes");
   await expect(page.getByLabel(/Amount/)).toHaveValue("60.00");
   await expect(page.getByLabel("Paid by")).toHaveValue("member-1");
+  const participants = page.locator('input[name="participants"]');
+  await expect(participants.nth(0)).toBeChecked();
+  await expect(participants.nth(1)).toBeChecked();
+  await participants.nth(1).uncheck();
   await page.getByLabel("Description").fill("Lift tickets");
   await page.getByLabel(/Amount/).fill("80");
   await page.getByLabel("Paid by").selectOption("member-2");
@@ -700,6 +731,7 @@ test("creates a group, adds an expense, and displays the calculated balance", as
       amount: 8000,
       category: "ENTERTAINMENT",
       paidBy: { id: "member-2" },
+      participants: [{ id: "member-1" }],
     },
   });
 
@@ -708,7 +740,7 @@ test("creates a group, adds an expense, and displays the calculated balance", as
   const balancesBackLink = page.getByRole("link", { name: "Back to groups" });
   await expect(balancesBackLink).toHaveAttribute("href", "/");
   await expect(page.getByText("Marc owes Alex")).toBeVisible();
-  await expect(page.getByText("€40.00")).toBeVisible();
+  await expect(page.getByText("€80.00")).toBeVisible();
   await balancesBackLink.click();
   await expect(page).toHaveURL("/");
   await expect(page.getByRole("heading", { name: "My groups" })).toBeVisible();

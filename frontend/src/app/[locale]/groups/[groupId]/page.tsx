@@ -29,6 +29,7 @@ type GroupExpense = {
   category: ExpenseCategory;
   paidBy: string;
   paidById: string | null;
+  participantIds: string[] | null;
   createdAt: string;
 };
 
@@ -89,6 +90,19 @@ function parseExpense(value: unknown): GroupExpense {
   }
 
   const payer = parsePayer(value.paidBy);
+  let participantIds: string[] | null = null;
+  if (value.participants !== undefined && value.participants !== null) {
+    if (!Array.isArray(value.participants)) {
+      throw new Error("The API returned invalid expense participants.");
+    }
+    const parsedParticipantIds = value.participants.map((participant) => {
+      if (!isRecord(participant) || typeof participant.id !== "string") {
+        throw new Error("The API returned invalid expense participants.");
+      }
+      return participant.id;
+    });
+    participantIds = parsedParticipantIds.length > 0 ? parsedParticipantIds : null;
+  }
   return {
     id: value.id,
     description: value.description,
@@ -96,6 +110,7 @@ function parseExpense(value: unknown): GroupExpense {
     category: value.category,
     paidBy: payer.name,
     paidById: payer.id,
+    participantIds,
     createdAt: value.createdAt,
   };
 }
@@ -276,8 +291,13 @@ export default function GroupDetailPage() {
     const amount = Math.round(amountValue * 100);
     const category = String(formData.get("category") ?? "");
     const paidById = String(formData.get("paidBy") ?? "");
+    const participantIds = formData.getAll("participants").map(String);
     if (!Number.isFinite(amountValue) || amountValue <= 0 || amount <= 0 || !Number.isSafeInteger(amount)) {
       setExpenseFormError(t("validAmount"));
+      return;
+    }
+    if (participantIds.length === 0) {
+      setExpenseFormError(t("selectParticipant"));
       return;
     }
 
@@ -296,6 +316,7 @@ export default function GroupDetailPage() {
           amount,
           category,
           paidBy: paidById ? { id: paidById } : null,
+          participants: participantIds.map((id) => ({ id })),
         }),
       });
       if (!response.ok) {
@@ -498,6 +519,24 @@ export default function GroupDetailPage() {
                 ))}
               </select>
             </label>
+            <fieldset className="group-detail__participants">
+              <legend>{t("participants")}</legend>
+              {members.map((member) => (
+                <label key={member.id}>
+                  <input
+                    defaultChecked={
+                      editingExpense?.participantIds === null ||
+                      editingExpense?.participantIds === undefined ||
+                      editingExpense.participantIds.includes(member.id)
+                    }
+                    name="participants"
+                    type="checkbox"
+                    value={member.id}
+                  />
+                  {member.name}
+                </label>
+              ))}
+            </fieldset>
             {expenseFormError && <p className="group-detail__form-error" role="alert">{expenseFormError}</p>}
             <button className="group-detail__form-submit" disabled={isSavingExpense} type="submit">
               {isSavingExpense ? t("saving") : editingExpense ? t("saveChanges") : t("add")}

@@ -169,6 +169,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessageKey(), request);
     }
 
+    @ExceptionHandler(InvalidExpenseParticipantsException.class)
+    public ResponseEntity<ApiError> handleInvalidExpenseParticipants(
+            InvalidExpenseParticipantsException exception,
+            HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request);
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiError> handleAuthenticationFailure(
             AuthenticationException exception,
