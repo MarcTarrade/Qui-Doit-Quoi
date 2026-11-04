@@ -1,5 +1,6 @@
 package com.quidoitquoi.api.models;
 
+import java.util.List;
 import java.util.UUID;
 
 import java.time.Instant;
@@ -16,8 +17,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -50,6 +53,13 @@ public class Expense {
     @ManyToOne
     @JoinColumn(name = "paid_by")
     private Member paidBy;
+
+    @ManyToMany
+    @JoinTable(
+            name = "expense_participants",
+            joinColumns = @JoinColumn(name = "expense_id"),
+            inverseJoinColumns = @JoinColumn(name = "member_id"))
+    private List<Member> participants;
 
     @ManyToOne 
     @JoinColumn(name = "group_id")
@@ -110,6 +120,14 @@ public class Expense {
 
     public void setPaidBy(Member paidBy) {
         this.paidBy = paidBy;
+    }
+
+    public List<Member> getParticipants() {
+        return participants;
+    }
+
+    public void setParticipants(List<Member> participants) {
+        this.participants = participants;
     }
 
     public Group getGroup() {

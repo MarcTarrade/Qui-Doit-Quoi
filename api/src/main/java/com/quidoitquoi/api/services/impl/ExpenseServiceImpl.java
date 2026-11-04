@@ -2,6 +2,10 @@ package com.quidoitquoi.api.services.impl;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -9,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.quidoitquoi.api.exceptions.MemberNotFoundException;
 import com.quidoitquoi.api.exceptions.ExpenseNotFoundException;
+import com.quidoitquoi.api.exceptions.InvalidExpenseParticipantsException;
 import com.quidoitquoi.api.exceptions.UserNotFoundException;
 import com.quidoitquoi.api.models.Expense;
 import com.quidoitquoi.api.models.Group;
@@ -68,12 +73,14 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .orElseThrow(() -> new UserNotFoundException(madeByUserId));
         expense.setGroup(group);
         expense.setPaidBy(resolveMember(expense, groupId));
+        expense.setParticipants(resolveParticipants(expense, groupId));
         Expense savedExpense = expenseRepository.save(expense);
         groupLogRepository.save(new GroupLog(GroupLog.EXPENSE_ADDED, group, madeBy));
         return savedExpense;
     }
 
     @Override
+    @Transactional
     public Optional<Expense> updateExpense(UUID id, Expense expense, UUID authenticatedUserId) {
         return expenseRepository.findById(id).map(existingExpense -> {
             UUID groupId = existingExpense.getGroup().getId();
@@ -84,6 +91,7 @@ public class ExpenseServiceImpl implements ExpenseService {
             existingExpense.setAmount(expense.getAmount());
             existingExpense.setCategory(expense.getCategory());
             existingExpense.setPaidBy(resolveMember(expense, groupId));
+            existingExpense.setParticipants(resolveParticipants(expense, groupId));
             return expenseRepository.save(existingExpense);
         });
     }
@@ -113,5 +121,40 @@ public class ExpenseServiceImpl implements ExpenseService {
             throw new MemberNotFoundException(memberId);
         }
         return member;
+    }
+
+    private List<Member> resolveParticipants(Expense expense, UUID groupId) {
+        List<Member> groupMembers = memberRepository.findByGroup_Id(groupId);
+        List<Member> requestedParticipants = expense.getParticipants();
+        if (requestedParticipants == null) {
+            if (groupMembers.isEmpty()) {
+                throw new InvalidExpenseParticipantsException();
+            }
+            return groupMembers.stream()
+                    .sorted(Comparator.comparing(Member::getId))
+                    .toList();
+        }
+        if (requestedParticipants.isEmpty()) {
+            throw new InvalidExpenseParticipantsException();
+        }
+
+        Set<UUID> requestedIds = new HashSet<>();
+        for (Member requestedParticipant : requestedParticipants) {
+            if (requestedParticipant == null || requestedParticipant.getId() == null) {
+                throw new InvalidExpenseParticipantsException();
+            }
+            requestedIds.add(requestedParticipant.getId());
+        }
+        List<Member> participants = new ArrayList<>();
+        for (Member member : groupMembers) {
+            if (requestedIds.remove(member.getId())) {
+                participants.add(member);
+            }
+        }
+        if (!requestedIds.isEmpty()) {
+            throw new InvalidExpenseParticipantsException();
+        }
+        participants.sort(Comparator.comparing(Member::getId));
+        return participants;
     }
 }

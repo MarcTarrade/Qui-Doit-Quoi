@@ -104,6 +104,8 @@
     "housing": "Housing",
     "entertainment": "Entertainment",
     "paidByLabel": "Paid by",
+    "participants": "Shared with",
+    "selectParticipant": "Select at least one member to share this expense.",
     "notAssigned": "Not assigned",
     "backToGroup": "Back to group",
     "saving": "Saving…",
