@@ -30,27 +30,27 @@ public class User {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @NotBlank(message = "Username is required")
-    @Size(max = 50, message = "Username must not exceed 50 characters")
+    @NotBlank(message = "{validation.username.required}")
+    @Size(max = 50, message = "{validation.username.max}")
     @Column(nullable = false, unique = false, length = 50)
     private String username;
 
-    @NotBlank(message = "Last name is required")
-    @Size(max = 100, message = "Last name must not exceed 100 characters")
+    @NotBlank(message = "{validation.lastname.required}")
+    @Size(max = 100, message = "{validation.lastname.max}")
     @Column(nullable = false, unique = false, length = 100)
     private String lastname;
 
-    @NotBlank(message = "First name is required")
-    @Size(max = 100, message = "First name must not exceed 100 characters")
+    @NotBlank(message = "{validation.firstname.required}")
+    @Size(max = 100, message = "{validation.firstname.max}")
     @Column(nullable = false, unique = false, length = 100)
     private String firstname;
 
-    @NotBlank(message = "Email is required")
-    @Email(message = "Email must be a valid address")
+    @NotBlank(message = "{validation.email.required}")
+    @Email(message = "{validation.email.invalid}")
     @Column(nullable = false, unique = true, length = 254)
     private String email;
 
-    @Size(max = 2048, message = "Image URL must not exceed 2048 characters")
+    @Size(max = 2048, message = "{validation.image-url.max}")
     @Column(name = "img", length = 2048)
     private String img;
 

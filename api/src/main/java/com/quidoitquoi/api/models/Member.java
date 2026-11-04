@@ -32,8 +32,8 @@ public class Member {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @NotBlank(message = "Member name is required")
-    @Size(max = 100, message = "Member name must not exceed 100 characters")
+    @NotBlank(message = "{validation.member-name.required}")
+    @Size(max = 100, message = "{validation.member-name.max}")
     @Column(nullable = false, length = 100)
     private String name;
 

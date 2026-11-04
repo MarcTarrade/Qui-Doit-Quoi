@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.quidoitquoi.api.exceptions.GlobalExceptionHandler;
+import com.quidoitquoi.api.config.ApiLocaleConfig;
 import com.quidoitquoi.api.models.User;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +33,7 @@ class AuthControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService))
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setLocaleResolver(new ApiLocaleConfig().localeResolver())
                 .build();
     }
 
@@ -59,6 +61,7 @@ class AuthControllerTest {
                 .thenReturn(new AuthResponse("login-token", user));
 
         mockMvc.perform(post("/api/auth/login")
+                        .header("Accept-Language", "en")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -87,6 +90,7 @@ class AuthControllerTest {
                 .thenThrow(new BadCredentialsException("Invalid credentials"));
 
         mockMvc.perform(post("/api/auth/login")
+                        .header("Accept-Language", "en")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -101,6 +105,7 @@ class AuthControllerTest {
     @Test
     void signupRejectsInvalidInput() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
+                        .header("Accept-Language", "en")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -117,6 +122,7 @@ class AuthControllerTest {
     @Test
     void loginRejectsInvalidInput() throws Exception {
         mockMvc.perform(post("/api/auth/login")
+                        .header("Accept-Language", "en")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -125,6 +131,43 @@ class AuthControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginReturnsFrenchErrorsWhenRequested() throws Exception {
+        when(authService.login(any(LoginRequest.class)))
+                .thenThrow(new BadCredentialsException("Invalid credentials"));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .header("Accept-Language", "fr")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "john.doe@example.com",
+                                  "password": "wrong-password"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("Non autorisé"))
+                .andExpect(jsonPath("$.message").value("Adresse e-mail ou mot de passe incorrect"));
+    }
+
+    @Test
+    void validationErrorsAreReturnedInFrenchWhenRequested() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .header("Accept-Language", "fr")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "",
+                                  "password": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("L’adresse e-mail est obligatoire")))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("Le mot de passe est obligatoire")));
     }
 
     private String signupJson() {

@@ -58,7 +58,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse login(LoginRequest request) {
         if (request == null || isBlank(request.email()) || isBlank(request.password())) {
-            throw new InvalidAuthRequestException("Email and password are required");
+            throw new InvalidAuthRequestException("api.error.login-fields-required");
         }
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password()));
@@ -74,7 +74,7 @@ public class AuthServiceImpl implements AuthService {
                 || isBlank(request.email())
                 || isBlank(request.password())) {
             throw new InvalidAuthRequestException(
-                    "Username, lastname, firstname, email, and password are required");
+                    "api.error.signup-fields-required");
         }
     }
 
