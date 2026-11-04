@@ -446,6 +446,9 @@ test("sign up, sign in, and sign out interactions work", async ({ page }) => {
   await api.install(page);
 
   await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Keep shared expenses clear and fair." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How it works" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Get started" })).toHaveAttribute("href", "/signup");
   await page.getByRole("link", { name: "Sign up" }).click();
   await expect(page.getByRole("heading", { name: "Qui Doit Quoi" })).toBeVisible();
   await page.getByRole("link", { name: "Log in" }).click();
