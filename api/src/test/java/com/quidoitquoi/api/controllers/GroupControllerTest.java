@@ -7,9 +7,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.mock.web.MockMultipartFile;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -39,15 +42,21 @@ import com.quidoitquoi.api.models.Group;
 import com.quidoitquoi.api.models.Settlement;
 import com.quidoitquoi.api.models.User;
 import com.quidoitquoi.api.services.GroupService;
+import com.quidoitquoi.api.services.GroupImageStorageService;
+import com.quidoitquoi.api.services.GroupImageStorageService.StoredGroupImage;
 
 @ExtendWith(MockitoExtension.class)
 class GroupControllerTest {
 
     private static final UUID GROUP_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID IMAGE_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
     @Mock
     private GroupService groupService;
+
+    @Mock
+    private GroupImageStorageService groupImageStorageService;
 
     private MockMvc mockMvc;
     private Group group;
@@ -55,7 +64,7 @@ class GroupControllerTest {
 
     @BeforeEach
     void setUp() {
-        GroupController groupController = new GroupController(groupService);
+        GroupController groupController = new GroupController(groupService, groupImageStorageService);
         mockMvc = MockMvcBuilders.standaloneSetup(groupController)
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -110,6 +119,41 @@ class GroupControllerTest {
         mockMvc.perform(get("/api/groups/not-a-uuid"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void getGroupImageReturnsCurrentImageToGroupMember() throws Exception {
+        String imageReference = "/api/groups/" + GROUP_ID + "/image/" + IMAGE_ID;
+        group.setImg(imageReference);
+        when(groupService.getGroupById(GROUP_ID, USER_ID)).thenReturn(Optional.of(group));
+        when(groupImageStorageService.imageIdFromReference(GROUP_ID, imageReference))
+                .thenReturn(Optional.of(IMAGE_ID));
+        when(groupImageStorageService.load(GROUP_ID, IMAGE_ID))
+                .thenReturn(Optional.of(new StoredGroupImage(new byte[] { 1, 2, 3 }, MediaType.IMAGE_PNG)));
+
+        mockMvc.perform(get("/api/groups/{id}/image/{imageId}", GROUP_ID, IMAGE_ID))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_PNG))
+                .andExpect(content().bytes(new byte[] { 1, 2, 3 }))
+                .andExpect(header().string("Cache-Control", "no-store"));
+    }
+
+    @Test
+    void uploadGroupImageDelegatesToAdminOnlyService() throws Exception {
+        when(groupService.updateGroupImage(eq(GROUP_ID), any(), eq(USER_ID))).thenReturn(group);
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "trip.png", MediaType.IMAGE_PNG_VALUE, new byte[] { 1, 2, 3 });
+
+        mockMvc.perform(multipart("/api/groups/{id}/image", GROUP_ID)
+                        .file(image)
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Trip"));
+
+        verify(groupService).updateGroupImage(eq(GROUP_ID), any(), eq(USER_ID));
     }
 
     @Test

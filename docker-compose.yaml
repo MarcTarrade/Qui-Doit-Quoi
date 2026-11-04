@@ -30,6 +30,9 @@ services:
       JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:-false}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3001}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      GROUP_IMAGE_STORAGE_PATH: /app/uploads/group-images
+    volumes:
+      - group_images:/app/uploads/group-images
     ports:
       - "8080:8080"
     depends_on:
@@ -49,4 +52,4 @@ services:
       - api
 
 volumes:
-  postgres_data:
+  group_images:

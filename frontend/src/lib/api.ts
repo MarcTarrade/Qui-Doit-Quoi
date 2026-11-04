@@ -1,5 +1,10 @@
 export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
+export function apiImageUrl(image: string | null): string | null {
+  if (!image) return null;
+  return image.startsWith("/") ? new URL(image, apiUrl).toString() : image;
+}
+
 export function apiRequest(path: string, options: RequestInit = {}): Promise<Response> {
   return fetch(`${apiUrl}${path}`, {
     ...options,

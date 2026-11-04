@@ -241,6 +241,18 @@ class MockApi {
         last: page + 1 >= totalPages,
         empty: content.length === 0,
       });
+    }
+    const groupImageMatch = path.match(/^\/api\/groups\/([^/]+)\/image$/);
+    if (method === "PUT" && groupImageMatch) {
+      const groupId = decodeURIComponent(groupImageMatch[1]);
+      const group = this.groups.find((item) => item.id === groupId);
+      this.writes.push({ method, path, body: {} });
+      if (!group) {
+        await this.fulfill(route, { message: "Group not found." }, 404);
+        return;
+      }
+      group.img = `/api/groups/${groupId}/image/uploaded-image`;
+      await this.fulfill(route, group);
       return;
     }
 
@@ -597,10 +609,6 @@ test("group settings update details and support add, cancel, and remove member a
   await page.getByLabel("Group name").fill("Updated trip");
   await page.getByLabel("Currency").fill("usd");
   await page.getByLabel("Description").fill("Updated description");
-  await page.getByRole("button", { name: "Edit group image URL" }).click();
-  const imageUrlInput = page.getByRole("textbox", { name: "Image URL" });
-  await expect(imageUrlInput).toBeFocused();
-  await imageUrlInput.fill("https://example.test/trip.png");
   const saveButton = page.getByRole("button", { name: "Save changes" });
   const saveButtonX = (await saveButton.boundingBox())?.x;
   expect(saveButtonX).toBeDefined();
@@ -611,9 +619,27 @@ test("group settings update details and support add, cancel, and remove member a
   expect(api.writes.find((write) => write.method === "PUT")?.body).toEqual({
     name: "Updated trip",
     description: "Updated description",
-    img: "https://example.test/trip.png",
+    img: null,
     currency: "USD",
   });
+
+  await page.getByLabel("Choose a PNG or JPEG group image").setInputFiles({
+    name: "trip.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await page.getByRole("button", { name: "Upload image" }).click();
+  await expect(page.getByText("Group image uploaded.")).toBeVisible();
+  await expect(page.locator(".group-settings__image-picture")).toHaveAttribute(
+    "src",
+    "http://localhost:8080/api/groups/group-test-1/image/uploaded-image",
+  );
+  expect(api.writes.some(
+    (write) => write.method === "PUT" && write.path === `/api/groups/${GROUP_ID}/image`,
+  )).toBe(true);
 
   await page.getByLabel("Add a member").fill("Casey");
   await page.getByRole("button", { name: "Add member" }).click();

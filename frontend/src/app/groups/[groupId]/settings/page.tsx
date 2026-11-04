@@ -12,7 +12,7 @@ import {
 } from "react";
 
 import GroupSectionNav from "@/components/groups/GroupSectionNav";
-import { apiRequest, apiRequestWithCsrf } from "@/lib/api";
+import { apiImageUrl, apiRequest, apiRequestWithCsrf } from "@/lib/api";
 
 type Group = {
   id: string;
@@ -151,7 +151,7 @@ function formatActivityDate(date: string): string {
 
 export default function GroupSettingsPage() {
   const { groupId } = useParams<{ groupId: string }>();
-  const imageUrlRef = useRef<HTMLInputElement>(null);
+  const imageFileRef = useRef<HTMLInputElement>(null);
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -166,15 +166,27 @@ export default function GroupSettingsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [currency, setCurrency] = useState("");
   const [memberName, setMemberName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState("");
+  const [imageUploadMessage, setImageUploadMessage] = useState("");
   const [addingMember, setAddingMember] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [settingsMessage, setSettingsMessage] = useState("");
   const [settingsError, setSettingsError] = useState("");
   const [memberError, setMemberError] = useState("");
   const [memberMessage, setMemberMessage] = useState("");
+
+  useEffect(
+    () => () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    },
+    [imagePreview],
+  );
 
   const retry = useCallback(() => {
     setLoadError("");
@@ -325,6 +337,39 @@ export default function GroupSettingsPage() {
     }
   }
 
+  async function uploadGroupImage() {
+    if (!group || !selectedImage) return;
+
+    setUploadingImage(true);
+    setImageUploadError("");
+    setImageUploadMessage("");
+    try {
+      const formData = new FormData();
+      formData.set("image", selectedImage);
+      const response = await apiRequestWithCsrf(
+        `/api/groups/${encodeURIComponent(group.id)}/image`,
+        { method: "PUT", body: formData },
+      );
+      if (!response.ok) {
+        throw new Error(`Uploading the group image failed (${response.status}).`);
+      }
+
+      const updatedGroup = parseGroup(await response.json());
+      setGroup(updatedGroup);
+      setImage(updatedGroup.image);
+      setSelectedImage(null);
+      setImagePreview(null);
+      if (imageFileRef.current) imageFileRef.current.value = "";
+      setImageUploadMessage("Group image uploaded.");
+    } catch (error) {
+      setImageUploadError(
+        error instanceof Error ? error.message : "An unexpected error occurred.",
+      );
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
   async function addMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!group || !memberName.trim()) return;
@@ -452,16 +497,18 @@ export default function GroupSettingsPage() {
               <div className="group-settings__image">
                 <span className="group-settings__image-title">Group image</span>
                 <button
-                  aria-label="Edit group image URL"
+                  aria-label="Choose group image"
                   className="group-settings__image-preview"
-                  onClick={() => imageUrlRef.current?.focus()}
+                  disabled={uploadingImage}
+                  onClick={() => imageFileRef.current?.click()}
                   type="button"
                 >
                   <Image
                     alt=""
                     className="group-settings__image-picture"
+                    crossOrigin={!imagePreview && image.startsWith("/api/") ? "use-credentials" : undefined}
                     height={170}
-                    src={image || "/group-detail/group-image-placeholder.svg"}
+                    src={imagePreview || apiImageUrl(image) || "/group-detail/group-image-placeholder.svg"}
                     unoptimized
                     width={170}
                   />
@@ -474,16 +521,52 @@ export default function GroupSettingsPage() {
                     width={40}
                   />
                 </button>
-                <label>
-                  Image URL
-                  <input
-                    maxLength={2048}
-                    onChange={(event) => setImage(event.target.value)}
-                    ref={imageUrlRef}
-                    type="url"
-                    value={image}
-                  />
-                </label>
+                <input
+                  accept="image/png,image/jpeg"
+                  aria-label="Choose a PNG or JPEG group image"
+                  className="group-settings__image-input"
+                  disabled={uploadingImage}
+                  onChange={(event) => {
+                    setImageUploadError("");
+                    setImageUploadMessage("");
+                    const file = event.target.files?.[0] ?? null;
+                    if (file && file.type !== "image/png" && file.type !== "image/jpeg") {
+                      setSelectedImage(null);
+                      setImagePreview(null);
+                      event.target.value = "";
+                      setImageUploadError("Only PNG and JPEG images are supported.");
+                      return;
+                    }
+                    if (file && file.size > 5 * 1024 * 1024) {
+                      setSelectedImage(null);
+                      setImagePreview(null);
+                      event.target.value = "";
+                      setImageUploadError("Group images must be 5 MB or smaller.");
+                      return;
+                    }
+                    setSelectedImage(file);
+                    setImagePreview(file ? URL.createObjectURL(file) : null);
+                  }}
+                  ref={imageFileRef}
+                  type="file"
+                />
+                <p className="group-settings__image-hint">PNG or JPEG, up to 5 MB</p>
+                {selectedImage && (
+                  <button
+                    className="group-detail__form-submit group-settings__image-upload"
+                    disabled={uploadingImage}
+                    onClick={() => void uploadGroupImage()}
+                    type="button"
+                  >
+                    {uploadingImage ? "Uploading…" : "Upload image"}
+                  </button>
+                )}
+                {imageUploadError && (
+                  <p className="group-detail__form-error" role="alert">{imageUploadError}</p>
+                )}
+                {imageUploadMessage && (
+                  <p className="group-settings__success" role="status">{imageUploadMessage}</p>
+                )}
               </div>
               <div className="group-settings__save">
                 <button className="group-detail__form-submit" disabled={saving} type="submit">

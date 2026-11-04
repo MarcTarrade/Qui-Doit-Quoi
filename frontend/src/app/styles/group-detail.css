@@ -528,6 +528,22 @@
   left: calc(50% - 1.25rem);
 }
 
+.group-settings .group-settings__image-input {
+  display: none;
+}
+
+.group-settings__image-hint {
+  margin: 0;
+  color: var(--grey-500);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.group-settings__image-upload {
+  width: auto;
+  padding: 0 1rem;
+}
+
 .group-settings__save {
   display: flex;
   align-items: center;
