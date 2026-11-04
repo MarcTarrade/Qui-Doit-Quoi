@@ -844,9 +844,12 @@
 }
 
 .home-create-dialog {
+  position: fixed;
+  inset: 0;
   width: min(calc(100% - 2rem), 30rem);
   max-width: none;
   max-height: calc(100% - 2rem);
+  margin: auto;
   padding: 0;
   overflow: auto;
   border: 1px solid var(--grey-100);
