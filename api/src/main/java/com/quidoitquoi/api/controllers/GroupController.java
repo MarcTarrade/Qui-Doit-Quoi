@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -16,7 +18,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.constraints.Min;
@@ -31,6 +35,7 @@ import com.quidoitquoi.api.dto.GroupLogResponse;
 import com.quidoitquoi.api.models.Group;
 import com.quidoitquoi.api.models.Settlement;
 import com.quidoitquoi.api.services.GroupService;
+import com.quidoitquoi.api.services.GroupImageStorageService;
 
 @RestController
 @Validated
@@ -40,9 +45,13 @@ import com.quidoitquoi.api.services.GroupService;
 public class GroupController {
 
     private final GroupService groupService;
+    private final GroupImageStorageService groupImageStorageService;
 
-    public GroupController(GroupService groupService) {
+    public GroupController(
+            GroupService groupService,
+            GroupImageStorageService groupImageStorageService) {
         this.groupService = groupService;
+        this.groupImageStorageService = groupImageStorageService;
     }
 
     @GetMapping("/user/{userId}")
@@ -64,6 +73,30 @@ public class GroupController {
         Group group = groupService.getGroupById(id, authenticatedUserId(jwt))
                 .orElseThrow(() -> new GroupNotFoundException(id));
         return ResponseEntity.ok(group);
+    }
+
+    @GetMapping("/{id}/image/{imageId}")
+    @Operation(summary = "Get a group's image", description = "Returns a group's uploaded image to an authenticated group member.")
+    @ApiResponse(responseCode = "200", description = "Group image returned")
+    @ApiResponse(responseCode = "404", description = "Group or image not found")
+    public ResponseEntity<byte[]> getGroupImage(
+            @PathVariable UUID id,
+            @PathVariable UUID imageId,
+            @AuthenticationPrincipal Jwt jwt) {
+        Group group = groupService.getGroupById(id, authenticatedUserId(jwt))
+                .orElseThrow(() -> new GroupNotFoundException(id));
+        if (!groupImageStorageService.imageIdFromReference(id, group.getImg())
+                .filter(currentImageId -> currentImageId.equals(imageId))
+                .isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return groupImageStorageService.load(id, imageId)
+                .map(image -> ResponseEntity.ok()
+                        .contentType(image.mediaType())
+                        .cacheControl(CacheControl.noStore())
+                        .body(image.content()))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}/logs")
@@ -118,6 +151,18 @@ public class GroupController {
         Group updatedGroup = groupService.updateGroup(id, group, madeByUserId)
                 .orElseThrow(() -> new GroupNotFoundException(id));
         return ResponseEntity.ok(updatedGroup);
+    }
+
+    @PutMapping(path = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload a group's image", description = "Uploads a PNG or JPEG image. Only the group admin may replace it.")
+    @ApiResponse(responseCode = "200", description = "Group image uploaded")
+    @ApiResponse(responseCode = "400", description = "Invalid image")
+    @ApiResponse(responseCode = "404", description = "Group not found")
+    public ResponseEntity<Group> updateGroupImage(
+            @PathVariable UUID id,
+            @RequestPart("image") MultipartFile image,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(groupService.updateGroupImage(id, image, authenticatedUserId(jwt)));
     }
 
     @DeleteMapping("/{id}")

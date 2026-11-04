@@ -7,12 +7,18 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.quidoitquoi.api.dto.GroupLogResponse;
 import com.quidoitquoi.api.exceptions.ForbiddenOperationException;
@@ -30,10 +36,13 @@ import com.quidoitquoi.api.repository.GroupRepository;
 import com.quidoitquoi.api.repository.MemberRepository;
 import com.quidoitquoi.api.repository.UserRepository;
 import com.quidoitquoi.api.services.GroupAuthorizationService;
+import com.quidoitquoi.api.services.GroupImageStorageService;
 import com.quidoitquoi.api.services.GroupService;
 
 @Service
 public class GroupServiceImpl implements GroupService {
+
+    private static final Logger logger = LoggerFactory.getLogger(GroupServiceImpl.class);
 
     private final GroupRepository groupRepository;
     private final GroupLogRepository groupLogRepository;
@@ -41,6 +50,7 @@ public class GroupServiceImpl implements GroupService {
     private final MemberRepository memberRepository;
     private final ExpenseRepository expenseRepository;
     private final GroupAuthorizationService groupAuthorizationService;
+    private final GroupImageStorageService groupImageStorageService;
 
     public GroupServiceImpl(
             GroupRepository groupRepository,
@@ -48,13 +58,15 @@ public class GroupServiceImpl implements GroupService {
             UserRepository userRepository,
             MemberRepository memberRepository,
             ExpenseRepository expenseRepository,
-            GroupAuthorizationService groupAuthorizationService) {
+            GroupAuthorizationService groupAuthorizationService,
+            GroupImageStorageService groupImageStorageService) {
         this.groupRepository = groupRepository;
         this.groupLogRepository = groupLogRepository;
         this.userRepository = userRepository;
         this.memberRepository = memberRepository;
         this.expenseRepository = expenseRepository;
         this.groupAuthorizationService = groupAuthorizationService;
+        this.groupImageStorageService = groupImageStorageService;
     }
 
     @Override
@@ -216,9 +228,52 @@ public class GroupServiceImpl implements GroupService {
     }
 
     @Override
+    @Transactional
+    public Group updateGroupImage(UUID id, MultipartFile upload, UUID madeByUserId) {
+        Group group = groupAuthorizationService.requireAdmin(id, madeByUserId);
+        UUID newImageId = groupImageStorageService.store(id, upload);
+        Optional<UUID> previousImageId =
+                groupImageStorageService.imageIdFromReference(id, group.getImg());
+
+        group.setImg(groupImageStorageService.reference(id, newImageId));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    UUID imageToDelete = status == STATUS_COMMITTED
+                            ? previousImageId.orElse(null)
+                            : newImageId;
+                    if (imageToDelete == null) {
+                        return;
+                    }
+                    try {
+                        groupImageStorageService.delete(id, imageToDelete);
+                    } catch (IOException exception) {
+                        logger.error("Unable to clean up group image {} for group {}", imageToDelete, id, exception);
+                    }
+                }
+            });
+        }
+
+        Group savedGroup = groupRepository.save(group);
+        User madeBy = userRepository.findById(madeByUserId)
+                .orElseThrow(() -> new UserNotFoundException(madeByUserId));
+        groupLogRepository.save(new GroupLog(GroupLog.GROUP_UPDATED, savedGroup, madeBy));
+        return savedGroup;
+    }
+
+    @Override
     public boolean deleteGroup(UUID id, UUID authenticatedUserId) {
         Group group = groupAuthorizationService.requireAdmin(id, authenticatedUserId);
+        Optional<UUID> imageId = groupImageStorageService.imageIdFromReference(id, group.getImg());
         groupRepository.delete(group);
+        if (imageId.isPresent()) {
+            try {
+                groupImageStorageService.delete(id, imageId.get());
+            } catch (IOException exception) {
+                logger.error("Unable to clean up image for deleted group {}", id, exception);
+            }
+        }
         return true;
     }
 }

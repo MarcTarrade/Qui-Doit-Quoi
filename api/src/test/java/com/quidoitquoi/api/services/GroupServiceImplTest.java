@@ -33,6 +33,9 @@ import com.quidoitquoi.api.repository.MemberRepository;
 import com.quidoitquoi.api.repository.UserRepository;
 import com.quidoitquoi.api.services.impl.GroupServiceImpl;
 import com.quidoitquoi.api.services.GroupAuthorizationService;
+import com.quidoitquoi.api.services.GroupImageStorageService;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 
 class GroupServiceImplTest {
 
@@ -49,6 +52,7 @@ class GroupServiceImplTest {
     private MemberRepository memberRepository;
     private ExpenseRepository expenseRepository;
     private GroupAuthorizationService groupAuthorizationService;
+    private GroupImageStorageService groupImageStorageService;
     private GroupServiceImpl groupService;
 
     @BeforeEach
@@ -59,13 +63,15 @@ class GroupServiceImplTest {
         memberRepository = mock(MemberRepository.class);
         expenseRepository = mock(ExpenseRepository.class);
         groupAuthorizationService = mock(GroupAuthorizationService.class);
+        groupImageStorageService = mock(GroupImageStorageService.class);
         groupService = new GroupServiceImpl(
                 groupRepository,
                 groupLogRepository,
                 userRepository,
                 memberRepository,
                 expenseRepository,
-                groupAuthorizationService);
+                groupAuthorizationService,
+                groupImageStorageService);
     }
 
     @Test
@@ -136,6 +142,28 @@ class GroupServiceImplTest {
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("date").getDirection())
                 .isEqualTo(org.springframework.data.domain.Sort.Direction.DESC);
+    }
+
+    @Test
+    void updateGroupImageSavesStoredImageReferenceForGroupAdmin() {
+        Group group = mock(Group.class);
+        UUID imageId = UUID.randomUUID();
+        MockMultipartFile upload = new MockMultipartFile(
+                "image", "trip.png", MediaType.IMAGE_PNG_VALUE, new byte[] { 1, 2, 3 });
+        when(groupAuthorizationService.requireAdmin(GROUP_ID, ADMIN_ID)).thenReturn(group);
+        when(userRepository.findById(ADMIN_ID)).thenReturn(java.util.Optional.of(mock(User.class)));
+        when(group.getImg()).thenReturn(null);
+        when(groupImageStorageService.store(GROUP_ID, upload)).thenReturn(imageId);
+        when(groupImageStorageService.reference(GROUP_ID, imageId))
+                .thenReturn("/api/groups/" + GROUP_ID + "/image/" + imageId);
+        when(groupRepository.save(group)).thenReturn(group);
+
+        Group updatedGroup = groupService.updateGroupImage(GROUP_ID, upload, ADMIN_ID);
+
+        assertThat(updatedGroup).isSameAs(group);
+        verify(group).setImg("/api/groups/" + GROUP_ID + "/image/" + imageId);
+        verify(groupRepository).save(group);
+        verify(groupLogRepository).save(any(GroupLog.class));
     }
 
     @Test

@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.quidoitquoi.api.dto.GroupLogResponse;
 import com.quidoitquoi.api.models.Group;
@@ -26,6 +27,8 @@ public interface GroupService {
     Group createGroup(UUID userId, Group group, UUID authenticatedUserId);
 
     Optional<Group> updateGroup(UUID id, Group group, UUID madeByUserId);
+
+    Group updateGroupImage(UUID id, MultipartFile image, UUID madeByUserId);
 
     boolean deleteGroup(UUID id, UUID authenticatedUserId);
 }

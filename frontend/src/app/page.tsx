@@ -6,7 +6,13 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 
 import SiteHeader from "@/components/auth/SiteHeader";
 import type { AuthUser } from "@/lib/auth-types";
-import { apiRequest, apiRequestWithCsrf, apiUrl, checkApiConnection } from "@/lib/api";
+import {
+  apiImageUrl,
+  apiRequest,
+  apiRequestWithCsrf,
+  apiUrl,
+  checkApiConnection,
+} from "@/lib/api";
 
 type Group = {
   id: string;
@@ -234,16 +240,18 @@ export default function Home() {
                         <Image
                           alt=""
                           className="home-group-card__avatar home-group-card__avatar--desktop"
+                          crossOrigin={group.img?.startsWith("/api/") ? "use-credentials" : undefined}
                           height={59}
-                          src={group.img || "/groups/group-avatar.svg"}
+                          src={apiImageUrl(group.img) || "/groups/group-avatar.svg"}
                           unoptimized
                           width={59}
                         />
                         <Image
                           alt=""
                           className="home-group-card__avatar home-group-card__avatar--mobile"
+                          crossOrigin={group.img?.startsWith("/api/") ? "use-credentials" : undefined}
                           height={50}
-                          src={group.img || "/groups/group-avatar-mobile.svg"}
+                          src={apiImageUrl(group.img) || "/groups/group-avatar-mobile.svg"}
                           unoptimized
                           width={50}
                         />
