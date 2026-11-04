@@ -25,6 +25,14 @@ type ApiExpense = {
   createdAt: string;
 };
 
+type ApiGroupLog = {
+  id: string;
+  type: "EXPENSE_ADDED" | "GROUP_UPDATED";
+  date: string;
+  madeById: string;
+  madeByUsername: string;
+};
+
 type ApiUser = {
   id: string;
   firstname: string;
@@ -38,6 +46,7 @@ type ApiOptions = {
   groups?: ApiGroup[];
   members?: ApiMember[];
   expenses?: ApiExpense[];
+  activityLogs?: ApiGroupLog[];
   failCount?: Record<string, number>;
 };
 
@@ -51,6 +60,7 @@ class MockApi {
   readonly groups: ApiGroup[];
   readonly members = new Map<string, ApiMember[]>();
   readonly expenses = new Map<string, ApiExpense[]>();
+  readonly activityLogs = new Map<string, ApiGroupLog[]>();
   readonly writes: WriteRequest[] = [];
   readonly requests: string[] = [];
   readonly failedRequests: string[] = [];
@@ -73,6 +83,10 @@ class MockApi {
         group.id,
         structuredClone(group.id === GROUP_ID ? options.expenses ?? [] : []),
       );
+      this.activityLogs.set(
+        group.id,
+        structuredClone(group.id === GROUP_ID ? options.activityLogs ?? [] : []),
+      );
     }
   }
 
@@ -84,14 +98,16 @@ class MockApi {
     await route.fulfill({
       status,
       contentType: "application/json",
-      headers: this.corsHeaders(),
+      headers: this.corsHeaders(
+        route.request().headers().origin ?? "http://localhost:3001",
+      ),
       body: JSON.stringify(body),
     });
   }
 
-  private corsHeaders() {
+  private corsHeaders(origin: string) {
     return {
-      "access-control-allow-origin": "http://localhost:3001",
+      "access-control-allow-origin": origin,
       "access-control-allow-credentials": "true",
       "access-control-allow-headers": "content-type,x-xsrf-token",
       "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
@@ -106,7 +122,10 @@ class MockApi {
     this.requests.push(`${method} ${path}`);
 
     if (method === "OPTIONS") {
-      await route.fulfill({ status: 204, headers: this.corsHeaders() });
+      await route.fulfill({
+        status: 204,
+        headers: this.corsHeaders(request.headers().origin ?? "http://localhost:3001"),
+      });
       return;
     }
 
@@ -140,7 +159,10 @@ class MockApi {
     if (method === "POST" && path === "/api/auth/logout") {
       this.authenticated = false;
       this.writes.push({ method, path, body: {} });
-      await route.fulfill({ status: 204, headers: this.corsHeaders() });
+      await route.fulfill({
+        status: 204,
+        headers: this.corsHeaders(request.headers().origin ?? "http://localhost:3001"),
+      });
       return;
     }
 
@@ -201,6 +223,27 @@ class MockApi {
       }
     }
 
+    const logsMatch = path.match(/^\/api\/groups\/([^/]+)\/logs$/);
+    if (method === "GET" && logsMatch) {
+      const groupId = decodeURIComponent(logsMatch[1]);
+      const logs = this.activityLogs.get(groupId) ?? [];
+      const page = Number(url.searchParams.get("page") ?? "0");
+      const size = Math.min(Number(url.searchParams.get("size") ?? "10"), 10);
+      const content = logs.slice(page * size, (page + 1) * size);
+      const totalPages = Math.ceil(logs.length / size);
+      await this.fulfill(route, {
+        content,
+        number: page,
+        totalPages,
+        totalElements: logs.length,
+        size,
+        first: page === 0,
+        last: page + 1 >= totalPages,
+        empty: content.length === 0,
+      });
+      return;
+    }
+
     const membersMatch = path.match(/^\/api\/groups\/([^/]+)\/members$/);
     if (membersMatch) {
       const groupId = decodeURIComponent(membersMatch[1]);
@@ -233,7 +276,10 @@ class MockApi {
           groupMembers.filter((member) => member.id !== memberId),
         );
       }
-      await route.fulfill({ status: 204, headers: this.corsHeaders() });
+      await route.fulfill({
+        status: 204,
+        headers: this.corsHeaders(request.headers().origin ?? "http://localhost:3001"),
+      });
       return;
     }
 
@@ -513,11 +559,38 @@ test("group settings update details and support add, cancel, and remove member a
     authenticated: true,
     groups: [testGroup()],
     members: testMembers(),
+    activityLogs: [
+      {
+        id: "log-updated",
+        type: "GROUP_UPDATED",
+        date: "2026-09-21T10:26:00Z",
+        madeById: USER_ID,
+        madeByUsername: "marc",
+      },
+      {
+        id: "log-expense",
+        type: "EXPENSE_ADDED",
+        date: "2026-09-21T10:20:00Z",
+        madeById: "user-baptiste",
+        madeByUsername: "Baptiste",
+      },
+      ...Array.from({ length: 9 }, (_, index) => ({
+        id: `log-extra-${index + 1}`,
+        type: "GROUP_UPDATED" as const,
+        date: "2026-09-20T10:00:00Z",
+        madeById: USER_ID,
+        madeByUsername: `User ${index + 1}`,
+      })),
+    ],
   });
   await api.install(page);
 
   await page.goto(`/groups/${GROUP_ID}/settings`);
   await expect(page.getByRole("heading", { name: "Lapland trip" })).toBeVisible();
+  await expect(page.getByText("Group settings were modified by marc")).toBeVisible();
+  await expect(page.getByText("An expense was added by Baptiste")).toBeVisible();
+  await page.getByRole("button", { name: "Load more" }).click();
+  await expect(page.getByText("Group settings were modified by User 9")).toBeVisible();
   const settingsBackLink = page.getByRole("link", { name: "Back to groups" });
   await expect(settingsBackLink).toHaveAttribute("href", "/");
 

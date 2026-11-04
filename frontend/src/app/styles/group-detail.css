@@ -595,9 +595,45 @@
   padding: 0 1.25rem;
 }
 
-.group-settings__activity p {
+.group-settings__activity-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.group-settings__activity-entry {
+  display: grid;
+  min-height: 2.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid var(--grey-100);
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.group-settings__activity-entry time {
+  color: var(--grey-700);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.group-settings__activity-status {
   margin: 0;
   color: var(--grey-500);
+}
+
+.group-settings__activity-more {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 @media (max-width: 700px) {
@@ -734,6 +770,16 @@
   .group-settings__save .group-detail__form-submit,
   .group-settings__add-member .group-detail__form-submit {
     width: 100%;
+  }
+
+  .group-settings__activity-entry {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+    padding: 0.625rem 0;
+  }
+
+  .group-settings__activity-entry time {
+    color: var(--grey-500);
   }
 
   .group-expense-list {

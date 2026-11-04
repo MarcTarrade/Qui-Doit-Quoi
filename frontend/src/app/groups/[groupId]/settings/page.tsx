@@ -27,7 +27,22 @@ type GroupMember = {
   name: string;
 };
 
+type GroupActivityLog = {
+  id: string;
+  type: string;
+  date: string;
+  madeByUsername: string;
+};
+
+type GroupActivityPage = {
+  content: GroupActivityLog[];
+  number: number;
+  totalPages: number;
+};
+
 type LoadState = "loading" | "ready" | "error";
+
+const ACTIVITY_PAGE_SIZE = 10;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -72,6 +87,68 @@ function parseMembers(value: unknown): GroupMember[] {
   });
 }
 
+function parseActivityPage(value: unknown): GroupActivityPage {
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.content) ||
+    typeof value.number !== "number" ||
+    !Number.isInteger(value.number) ||
+    value.number < 0 ||
+    typeof value.totalPages !== "number" ||
+    !Number.isInteger(value.totalPages) ||
+    value.totalPages < 0
+  ) {
+    throw new Error("The API returned an invalid activity log page.");
+  }
+
+  const content = value.content.map((item) => {
+    if (
+      !isRecord(item) ||
+      typeof item.id !== "string" ||
+      typeof item.type !== "string" ||
+      typeof item.date !== "string" ||
+      Number.isNaN(Date.parse(item.date)) ||
+      typeof item.madeByUsername !== "string"
+    ) {
+      throw new Error("The API returned an invalid activity log entry.");
+    }
+
+    return {
+      id: item.id,
+      type: item.type,
+      date: item.date,
+      madeByUsername: item.madeByUsername,
+    };
+  });
+
+  return {
+    content,
+    number: value.number,
+    totalPages: value.totalPages,
+  };
+}
+
+function describeActivity(log: GroupActivityLog): string {
+  switch (log.type) {
+    case "EXPENSE_ADDED":
+      return `An expense was added by ${log.madeByUsername}`;
+    case "GROUP_UPDATED":
+      return `Group settings were modified by ${log.madeByUsername}`;
+    default:
+      return `An activity was recorded by ${log.madeByUsername}`;
+  }
+}
+
+function formatActivityDate(date: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(date));
+}
+
 export default function GroupSettingsPage() {
   const { groupId } = useParams<{ groupId: string }>();
   const imageUrlRef = useRef<HTMLInputElement>(null);
@@ -80,6 +157,12 @@ export default function GroupSettingsPage() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [loadError, setLoadError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activityLogs, setActivityLogs] = useState<GroupActivityLog[]>([]);
+  const [activityPage, setActivityPage] = useState(0);
+  const [activityTotalPages, setActivityTotalPages] = useState(0);
+  const [activityRetryKey, setActivityRetryKey] = useState(0);
+  const [activityLoadState, setActivityLoadState] = useState<LoadState>("loading");
+  const [activityError, setActivityError] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
@@ -99,6 +182,10 @@ export default function GroupSettingsPage() {
     setGroup(null);
     setMembers([]);
     setRefreshKey((current) => current + 1);
+    setActivityLogs([]);
+    setActivityPage(0);
+    setActivityTotalPages(0);
+    setActivityRetryKey((current) => current + 1);
   }, []);
 
   useEffect(() => {
@@ -156,6 +243,43 @@ export default function GroupSettingsPage() {
     return () => controller.abort();
   }, [groupId, refreshKey]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadActivity() {
+      setActivityLoadState("loading");
+      setActivityError("");
+
+      try {
+        const response = await apiRequest(
+          `/api/groups/${encodeURIComponent(groupId)}/logs?page=${activityPage}&size=${ACTIVITY_PAGE_SIZE}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (!response.ok) {
+          throw new Error(`Unable to load activity logs (${response.status}).`);
+        }
+
+        const page = parseActivityPage(await response.json());
+        if (!controller.signal.aborted) {
+          setActivityLogs((current) =>
+            activityPage === 0 ? page.content : [...current, ...page.content],
+          );
+          setActivityTotalPages(page.totalPages);
+          setActivityLoadState("ready");
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setActivityError(
+          error instanceof Error ? error.message : "An unexpected error occurred.",
+        );
+        setActivityLoadState("error");
+      }
+    }
+
+    void loadActivity();
+    return () => controller.abort();
+  }, [activityPage, activityRetryKey, groupId]);
+
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!group) return;
@@ -187,6 +311,10 @@ export default function GroupSettingsPage() {
       setDescription(updatedGroup.description);
       setImage(updatedGroup.image);
       setCurrency(updatedGroup.currency);
+      setActivityLogs([]);
+      setActivityTotalPages(0);
+      setActivityPage(0);
+      setActivityRetryKey((current) => current + 1);
       setSettingsMessage("Group settings saved.");
     } catch (error) {
       setSettingsError(
@@ -412,7 +540,45 @@ export default function GroupSettingsPage() {
 
             <section aria-labelledby="group-activity-title" className="group-settings__card group-settings__activity">
               <h2 id="group-activity-title">Activity log</h2>
-              <p>Activity history is not available yet.</p>
+              {activityLogs.length > 0 && (
+                <ul className="group-settings__activity-list">
+                  {activityLogs.map((log) => (
+                    <li className="group-settings__activity-entry" key={log.id}>
+                      <span>{describeActivity(log)}</span>
+                      <time dateTime={log.date}>{formatActivityDate(log.date)}</time>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {activityLoadState === "loading" && (
+                <p className="group-settings__activity-status" role="status">
+                  {activityPage === 0 ? "Loading activity…" : "Loading more activity…"}
+                </p>
+              )}
+              {activityLoadState === "error" && (
+                <div className="group-detail__message" role="alert">
+                  <p>{activityError}</p>
+                  <button
+                    onClick={() => setActivityRetryKey((current) => current + 1)}
+                    type="button"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+              {activityLoadState === "ready" && activityLogs.length === 0 && (
+                <p className="group-settings__activity-status">No activity yet.</p>
+              )}
+              {activityLoadState === "ready" &&
+                activityPage + 1 < activityTotalPages && (
+                  <button
+                    className="group-settings__activity-more"
+                    onClick={() => setActivityPage((current) => current + 1)}
+                    type="button"
+                  >
+                    Load more
+                  </button>
+                )}
             </section>
           </>
         )}
