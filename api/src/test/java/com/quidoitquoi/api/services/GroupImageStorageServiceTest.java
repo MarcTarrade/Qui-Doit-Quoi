@@ -50,6 +50,21 @@ class GroupImageStorageServiceTest {
     }
 
     @Test
+    void storesProfileImagesInTheUserImageDirectory() throws Exception {
+        MockMultipartFile upload = new MockMultipartFile(
+                "image", "avatar.png", MediaType.IMAGE_PNG_VALUE, pngImage());
+
+        UUID imageId = storage.storeUserImage(GROUP_ID, upload);
+
+        assertThat(storage.userImageReference(GROUP_ID, imageId))
+                .isEqualTo("/api/users/" + GROUP_ID + "/image/" + imageId);
+        assertThat(storage.userImageIdFromReference(
+                GROUP_ID, storage.userImageReference(GROUP_ID, imageId)))
+                .contains(imageId);
+        assertThat(storage.loadUserImage(GROUP_ID, imageId)).isPresent();
+    }
+
+    @Test
     void rejectsNonImagePayloadEvenWhenFilenameLooksLikeAnImage() {
         MockMultipartFile upload = new MockMultipartFile(
                 "image", "not-an-image.png", MediaType.IMAGE_PNG_VALUE, "not an image".getBytes());

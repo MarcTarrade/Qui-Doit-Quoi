@@ -1,10 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
-import { apiRequest, apiRequestWithCsrf } from "@/lib/api";
+import { apiImageUrl, apiRequest, apiRequestWithCsrf } from "@/lib/api";
 import type { AuthUser } from "@/lib/auth-types";
 
 type AuthStatusProps = {
@@ -18,23 +19,37 @@ function isAuthUser(value: unknown): value is AuthUser {
     "firstname" in value && typeof value.firstname === "string" &&
     "username" in value && typeof value.username === "string" &&
     "lastname" in value && typeof value.lastname === "string" &&
-    "email" in value && typeof value.email === "string"
+    "email" in value && typeof value.email === "string" &&
+    "img" in value && (value.img === null || typeof value.img === "string")
   );
 }
 
 export default function AuthStatus({ onUserChange }: AuthStatusProps) {
   const router = useRouter();
   const t = useTranslations("Landing.auth");
+  const profileT = useTranslations("Profile");
   const commonT = useTranslations("Common");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [error, setError] = useState("");
   const onUserChangeRef = useRef(onUserChange);
+  const avatarUrl = apiImageUrl(user?.img ?? null);
 
   useEffect(() => {
     onUserChangeRef.current = onUserChange;
   }, [onUserChange]);
+
+  useEffect(() => {
+    function updateUser(event: Event) {
+      if (!(event instanceof CustomEvent) || !isAuthUser(event.detail)) return;
+      setUser(event.detail);
+      onUserChangeRef.current?.(event.detail);
+    }
+
+    window.addEventListener("auth-user-updated", updateUser);
+    return () => window.removeEventListener("auth-user-updated", updateUser);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,12 +101,27 @@ export default function AuthStatus({ onUserChange }: AuthStatusProps) {
         <span aria-label={t("loadingAccount")} className="auth-account-loading" />
       ) : user ? (
         <>
-          <span className="site-header__identity">
-            <span className="site-header__avatar" aria-hidden="true">
-              {user.firstname.charAt(0).toUpperCase()}
-            </span>
+          <Link
+            aria-label={profileT("openProfile")}
+            className="site-header__identity"
+            href="/profile"
+          >
+            {avatarUrl ? (
+              <Image
+                alt=""
+                className="site-header__avatar site-header__avatar-image"
+                height={32}
+                src={avatarUrl}
+                unoptimized
+                width={32}
+              />
+            ) : (
+              <span className="site-header__avatar" aria-hidden="true">
+                {user.firstname.charAt(0).toUpperCase()}
+              </span>
+            )}
             <span className="site-header__identity-name">{user.firstname}</span>
-          </span>
+          </Link>
           <button
             className="site-header__signout"
             disabled={isSigningOut}

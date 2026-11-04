@@ -17,6 +17,7 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,13 +32,29 @@ public class GroupImageStorageService {
     private static final long MAX_IMAGE_PIXELS = 16_000_000;
 
     private final Path storageRoot;
+    private final Path userStorageRoot;
 
+    @Autowired
     public GroupImageStorageService(
-            @Value("${app.group-image.storage-path:uploads/group-images}") String storagePath) {
+            @Value("${app.group-image.storage-path:uploads/group-images}") String storagePath,
+            @Value("${app.user-image.storage-path:uploads/user-images}") String userStoragePath) {
         storageRoot = Path.of(storagePath).toAbsolutePath().normalize();
+        userStorageRoot = Path.of(userStoragePath).toAbsolutePath().normalize();
+    }
+
+    public GroupImageStorageService(String storagePath) {
+        this(storagePath, storagePath);
     }
 
     public UUID store(UUID groupId, MultipartFile upload) {
+        return store(storageRoot, groupId, upload);
+    }
+
+    public UUID storeUserImage(UUID userId, MultipartFile upload) {
+        return store(userStorageRoot, userId, upload);
+    }
+
+    private UUID store(Path root, UUID ownerId, MultipartFile upload) {
         if (upload == null || upload.isEmpty()) {
             throw new InvalidGroupImageException("api.error.image-empty");
         }
@@ -52,11 +69,11 @@ public class GroupImageStorageService {
             }
             ValidatedImage image = validateAndNormalize(content);
             UUID imageId = UUID.randomUUID();
-            Path groupDirectory = storageRoot.resolve(groupId.toString());
-            Files.createDirectories(groupDirectory);
+            Path ownerDirectory = root.resolve(ownerId.toString());
+            Files.createDirectories(ownerDirectory);
 
-            Path imagePath = imagePath(groupDirectory, imageId, image.extension());
-            Path temporaryPath = Files.createTempFile(groupDirectory, "upload-", ".tmp");
+            Path imagePath = imagePath(ownerDirectory, imageId, image.extension());
+            Path temporaryPath = Files.createTempFile(ownerDirectory, "upload-", ".tmp");
             try {
                 Files.write(temporaryPath, image.content());
                 try {
@@ -80,9 +97,17 @@ public class GroupImageStorageService {
     }
 
     public Optional<StoredGroupImage> load(UUID groupId, UUID imageId) {
-        Path groupDirectory = storageRoot.resolve(groupId.toString());
+        return load(storageRoot, groupId, imageId);
+    }
+
+    public Optional<StoredGroupImage> loadUserImage(UUID userId, UUID imageId) {
+        return load(userStorageRoot, userId, imageId);
+    }
+
+    private Optional<StoredGroupImage> load(Path root, UUID ownerId, UUID imageId) {
+        Path ownerDirectory = root.resolve(ownerId.toString());
         for (String extension : new String[] { "png", "jpg" }) {
-            Path imagePath = imagePath(groupDirectory, imageId, extension);
+            Path imagePath = imagePath(ownerDirectory, imageId, extension);
             if (!Files.exists(imagePath)) {
                 continue;
             }
@@ -97,9 +122,17 @@ public class GroupImageStorageService {
     }
 
     public void delete(UUID groupId, UUID imageId) throws IOException {
-        Path groupDirectory = storageRoot.resolve(groupId.toString());
-        Files.deleteIfExists(imagePath(groupDirectory, imageId, "png"));
-        Files.deleteIfExists(imagePath(groupDirectory, imageId, "jpg"));
+        delete(storageRoot, groupId, imageId);
+    }
+
+    public void deleteUserImage(UUID userId, UUID imageId) throws IOException {
+        delete(userStorageRoot, userId, imageId);
+    }
+
+    private void delete(Path root, UUID ownerId, UUID imageId) throws IOException {
+        Path ownerDirectory = root.resolve(ownerId.toString());
+        Files.deleteIfExists(imagePath(ownerDirectory, imageId, "png"));
+        Files.deleteIfExists(imagePath(ownerDirectory, imageId, "jpg"));
     }
 
     public String reference(UUID groupId, UUID imageId) {
@@ -107,7 +140,18 @@ public class GroupImageStorageService {
     }
 
     public Optional<UUID> imageIdFromReference(UUID groupId, String reference) {
-        String prefix = "/api/groups/" + groupId + "/image/";
+        return imageIdFromReference("/api/groups/" + groupId + "/image/", reference);
+    }
+
+    public String userImageReference(UUID userId, UUID imageId) {
+        return "/api/users/" + userId + "/image/" + imageId;
+    }
+
+    public Optional<UUID> userImageIdFromReference(UUID userId, String reference) {
+        return imageIdFromReference("/api/users/" + userId + "/image/", reference);
+    }
+
+    private Optional<UUID> imageIdFromReference(String prefix, String reference) {
         if (reference == null || !reference.startsWith(prefix)) {
             return Optional.empty();
         }
