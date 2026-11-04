@@ -40,6 +40,7 @@ type ApiUser = {
   lastname: string;
   username: string;
   email: string;
+  img: string | null;
 };
 
 type ApiOptions = {
@@ -68,6 +69,14 @@ class MockApi {
   readonly failedRequests: string[] = [];
   private readonly failures: Map<string, number>;
   private authenticated: boolean;
+  private currentUser: ApiUser = {
+    id: USER_ID,
+    firstname: "Marc",
+    lastname: "Tarrade",
+    username: "marc",
+    email: "marc@example.com",
+    img: null,
+  };
   private nextGroupId = 1;
   private nextMemberId = 1;
   private nextExpenseId = 1;
@@ -157,6 +166,24 @@ class MockApi {
           : { status: 401, message: "Not signed in." },
         this.authenticated ? 200 : 401,
       );
+      return;
+    }
+
+    const userImageMatch = path.match(/^\/api\/users\/([^/]+)\/image$/);
+    if (userImageMatch && (method === "PUT" || method === "DELETE")) {
+      this.writes.push({ method, path, body: {} });
+      this.currentUser.img =
+        method === "PUT" ? `/api/users/${USER_ID}/image/profile-photo` : null;
+      await this.fulfill(route, this.currentUser);
+      return;
+    }
+
+    const userMatch = path.match(/^\/api\/users\/([^/]+)$/);
+    if (method === "PUT" && userMatch) {
+      const body = this.body(route);
+      this.writes.push({ method, path, body });
+      Object.assign(this.currentUser, body);
+      await this.fulfill(route, this.currentUser);
       return;
     }
 
@@ -392,13 +419,7 @@ class MockApi {
   }
 
   private user(): ApiUser {
-    return {
-      id: USER_ID,
-      firstname: "Marc",
-      lastname: "Tarrade",
-      username: "marc",
-      email: "marc@example.com",
-    };
+    return this.currentUser;
   }
 
   private resolveParticipants(groupId: string, value: unknown): ApiMember[] {
@@ -552,6 +573,50 @@ test("sign up, sign in, and sign out interactions work", async ({ page }) => {
     email: "marc@example.com",
     password: "safe-password",
   });
+});
+
+test("profile page edits account details and uploads a profile image", async ({ page }) => {
+  const api = new MockApi({ authenticated: true });
+  await api.install(page);
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Open your profile" }).click();
+  await expect(page.getByRole("heading", { name: "Your profile" })).toBeVisible();
+  await expect(page.getByLabel("Username")).toHaveValue("marc");
+
+  await page.getByLabel("Username").fill("marc-t");
+  await page.getByLabel("First name").fill("Marc-Antoine");
+  await page.getByLabel("Email address").fill("marc.t@example.com");
+  await page.getByLabel("Choose a profile picture").setInputFiles({
+    name: "avatar.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("profile image"),
+  });
+  await page.getByRole("button", { name: "Upload picture" }).click();
+
+  await expect(page.locator(".profile-card__avatar img")).toHaveAttribute(
+    "src",
+    /\/api\/users\/user-test-1\/image\/profile-photo/,
+  );
+  expect(api.writes.find((write) => write.method === "PUT" && write.path.endsWith("/image")))
+    .toMatchObject({ path: `/api/users/${USER_ID}/image` });
+  await page.getByRole("button", { name: "Save changes" }).click();
+
+  await expect(page.getByRole("status")).toHaveText("Your profile has been updated.");
+  expect(api.writes.find((write) => write.method === "PUT" && write.path === `/api/users/${USER_ID}`))
+    .toMatchObject({
+    path: `/api/users/${USER_ID}`,
+    body: {
+      username: "marc-t",
+      firstname: "Marc-Antoine",
+      lastname: "Tarrade",
+      email: "marc.t@example.com",
+    },
+  });
+
+  await page.goto("/fr/profile");
+  await expect(page.getByRole("heading", { name: "Votre profil" })).toBeVisible();
+  await expect(page.getByLabel("Nom d’utilisateur")).toHaveValue("marc-t");
 });
 
 test("landing page detects French and remembers a manual language choice", async ({ page }) => {

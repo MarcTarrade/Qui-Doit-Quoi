@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -33,6 +35,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.quidoitquoi.api.exceptions.GlobalExceptionHandler;
 import com.quidoitquoi.api.models.User;
 import com.quidoitquoi.api.services.UserService;
+import com.quidoitquoi.api.services.GroupImageStorageService;
 
 @ExtendWith(MockitoExtension.class)
 class UserControllerTest {
@@ -42,12 +45,15 @@ class UserControllerTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private GroupImageStorageService imageStorageService;
+
     private MockMvc mockMvc;
     private User user;
 
     @BeforeEach
     void setUp() {
-        UserController userController = new UserController(userService);
+        UserController userController = new UserController(userService, imageStorageService);
         mockMvc = MockMvcBuilders.standaloneSetup(userController)
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -136,6 +142,50 @@ class UserControllerTest {
                         .content(userJson()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("john.doe@example.com"));
+    }
+
+    @Test
+    void updateUserImageUploadsForTheAuthenticatedUser() throws Exception {
+        when(userService.updateUserImage(eq(USER_ID), any())).thenReturn(Optional.of(user));
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "avatar.png", MediaType.IMAGE_PNG_VALUE, new byte[] { 1, 2, 3 });
+
+        mockMvc.perform(multipart("/api/users/{id}/image", USER_ID)
+                        .file(image)
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("jdoe"));
+
+        verify(userService).updateUserImage(eq(USER_ID), any());
+    }
+
+    @Test
+    void updateUserImageRejectsAnotherUsersId() throws Exception {
+        UUID anotherUserId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "avatar.png", MediaType.IMAGE_PNG_VALUE, new byte[] { 1, 2, 3 });
+
+        mockMvc.perform(multipart("/api/users/{id}/image", anotherUserId)
+                        .file(image)
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        }))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deleteUserImageRemovesTheCurrentUsersImage() throws Exception {
+        when(userService.deleteUserImage(USER_ID)).thenReturn(Optional.of(user));
+
+        mockMvc.perform(delete("/api/users/{id}/image", USER_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("jdoe"));
+
+        verify(userService).deleteUserImage(USER_ID);
     }
 
     @Test

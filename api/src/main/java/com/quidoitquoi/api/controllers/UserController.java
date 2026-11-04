@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,7 +16,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +30,7 @@ import com.quidoitquoi.api.exceptions.ForbiddenOperationException;
 import com.quidoitquoi.api.exceptions.UserNotFoundException;
 import com.quidoitquoi.api.models.User;
 import com.quidoitquoi.api.services.UserService;
+import com.quidoitquoi.api.services.GroupImageStorageService;
 
 @RestController
 @RequestMapping("/api/users")
@@ -33,9 +38,11 @@ import com.quidoitquoi.api.services.UserService;
 @SecurityRequirement(name = "bearerAuth")
 public class UserController {
 	private final UserService userService;
+	private final GroupImageStorageService imageStorageService;
 
-	public UserController(UserService userService) {
+	public UserController(UserService userService, GroupImageStorageService imageStorageService) {
 		this.userService = userService;
+		this.imageStorageService = imageStorageService;
 	}
 
 	@GetMapping
@@ -68,6 +75,23 @@ public class UserController {
 		return ResponseEntity.ok(user);
 	}
 
+	@GetMapping("/{id}/image/{imageId}")
+	@Operation(summary = "Get a profile image", description = "Returns an uploaded image belonging to the authenticated user.")
+	@ApiResponse(responseCode = "200", description = "Profile image returned")
+	@ApiResponse(responseCode = "404", description = "Image not found")
+	public ResponseEntity<byte[]> getUserImage(
+			@PathVariable UUID id,
+			@PathVariable UUID imageId,
+			@AuthenticationPrincipal Jwt jwt) {
+		requireCurrentUser(id, jwt);
+		return imageStorageService.loadUserImage(id, imageId)
+				.map(image -> ResponseEntity.ok()
+						.contentType(image.mediaType())
+						.cacheControl(CacheControl.noStore())
+						.body(image.content()))
+				.orElseGet(() -> ResponseEntity.notFound().build());
+	}
+
 	@PostMapping
 	@Operation(summary = "Create a user", description = "Creates a user from the validated request body.")
 	@ApiResponse(responseCode = "201", description = "User created")
@@ -89,6 +113,34 @@ public class UserController {
 			@Valid @RequestBody User user) {
 		requireCurrentUser(id, jwt);
 		User updatedUser = userService.updateUser(id, user)
+				.orElseThrow(() -> new UserNotFoundException(id));
+		return ResponseEntity.ok(updatedUser);
+	}
+
+	@PutMapping(path = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@Operation(summary = "Upload a profile image", description = "Uploads a PNG or JPEG profile image for the authenticated user.")
+	@ApiResponse(responseCode = "200", description = "Profile image uploaded")
+	@ApiResponse(responseCode = "400", description = "Invalid image")
+	@ApiResponse(responseCode = "404", description = "User not found")
+	public ResponseEntity<User> updateUserImage(
+			@PathVariable UUID id,
+			@RequestPart("image") MultipartFile image,
+			@AuthenticationPrincipal Jwt jwt) {
+		requireCurrentUser(id, jwt);
+		User updatedUser = userService.updateUserImage(id, image)
+				.orElseThrow(() -> new UserNotFoundException(id));
+		return ResponseEntity.ok(updatedUser);
+	}
+
+	@DeleteMapping("/{id}/image")
+	@Operation(summary = "Delete a profile image", description = "Removes the authenticated user's profile image.")
+	@ApiResponse(responseCode = "200", description = "Profile image removed")
+	@ApiResponse(responseCode = "404", description = "User not found")
+	public ResponseEntity<User> deleteUserImage(
+			@PathVariable UUID id,
+			@AuthenticationPrincipal Jwt jwt) {
+		requireCurrentUser(id, jwt);
+		User updatedUser = userService.deleteUserImage(id)
 				.orElseThrow(() -> new UserNotFoundException(id));
 		return ResponseEntity.ok(updatedUser);
 	}
