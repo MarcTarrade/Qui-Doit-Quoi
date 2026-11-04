@@ -531,6 +531,87 @@ test("sign up, sign in, and sign out interactions work", async ({ page }) => {
   });
 });
 
+test("landing page detects French and remembers a manual language choice", async ({ page }) => {
+  const api = new MockApi();
+  await api.install(page);
+  const negotiationResponse = await page.request.get("/", {
+    headers: { "Accept-Language": "fr-FR,fr;q=0.9" },
+    maxRedirects: 0,
+  });
+  expect(negotiationResponse.status()).toBe(307);
+  expect(negotiationResponse.headers().location).toBe("/fr");
+
+  await page.goto("/fr");
+  await expect(page).toHaveURL(/\/fr$/);
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+  await expect(page.getByRole("heading", { name: "Des dépenses partagées claires et équitables." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Commencer" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Comment ça marche" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Se connecter" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "S’inscrire" })).toBeVisible();
+
+  await page.getByRole("combobox", { name: "Langue" }).selectOption("en");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("heading", { name: "Keep shared expenses clear and fair." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Keep shared expenses clear and fair." })).toBeVisible();
+});
+
+test("French translations are used across authentication and group pages", async ({ page }) => {
+  const api = new MockApi({
+    authenticated: true,
+    groups: [testGroup()],
+    members: testMembers(),
+    expenses: [{
+      id: "expense-fr",
+      description: "Train tickets",
+      amount: 2400,
+      category: "TRANSPORT",
+      paidBy: { id: "member-marc", name: "Marc" },
+      createdAt: "2026-09-21T10:20:00Z",
+    }],
+    activityLogs: [{
+      id: "log-fr",
+      type: "GROUP_UPDATED",
+      date: "2026-09-21T10:26:00Z",
+      madeById: USER_ID,
+      madeByUsername: "marc",
+    }],
+  });
+  await api.install(page);
+
+  await page.goto("/fr/login");
+  await expect(page.getByLabel("Adresse e-mail")).toBeVisible();
+  await expect(page.getByLabel("Mot de passe")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Se connecter" })).toBeVisible();
+
+  await page.goto("/fr/signup");
+  await expect(page.getByLabel("Nom d’utilisateur")).toBeVisible();
+  await expect(page.getByLabel("Nom", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Prénom", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Confirmer le mot de passe", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "S’inscrire" })).toBeVisible();
+
+  await page.goto("/fr");
+  await expect(page.getByRole("heading", { name: "Mes groupes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Nouveau groupe" })).toBeVisible();
+  await page.getByRole("link", { name: /Lapland trip/ }).click();
+  await expect(page.getByRole("navigation", { name: "Sections du groupe" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ajouter une dépense" })).toBeVisible();
+  await expect(page.getByText("Payé par Marc")).toBeVisible();
+
+  await page.getByRole("link", { name: "Soldes" }).click();
+  await expect(page.getByRole("heading", { name: "Détail des dettes" })).toBeVisible();
+  await expect(page.getByText("Alex doit à Marc")).toBeVisible();
+
+  await page.getByRole("link", { name: "Paramètres" }).click();
+  await expect(page.getByRole("heading", { name: "Informations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Journal d’activité" })).toBeVisible();
+  await expect(page.getByText("Les paramètres du groupe ont été modifiés par marc")).toBeVisible();
+});
+
 test("creates a group, adds an expense, and displays the calculated balance", async ({
   page,
 }) => {
@@ -581,7 +662,7 @@ test("creates a group, adds an expense, and displays the calculated balance", as
   await page.getByLabel(/Amount/).fill("60");
   await page.getByLabel("Category").selectOption("ENTERTAINMENT");
   await page.getByLabel("Paid by").selectOption({ label: "Marc" });
-  await page.getByRole("button", { name: "Add expense" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add an expense" }).click();
   await expect(page.getByText("Ski passes")).toBeVisible();
   expect(api.writes.find((write) => write.path.endsWith("/expenses"))?.body).toMatchObject({
     description: "Ski passes",

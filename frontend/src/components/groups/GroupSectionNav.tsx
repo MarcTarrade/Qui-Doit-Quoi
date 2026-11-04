@@ -1,5 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 
 type GroupSection = "expenses" | "balances" | "settings";
 
@@ -10,31 +11,26 @@ type GroupSectionNavProps = {
 
 const sections: {
   id: GroupSection | "statistics";
-  label: string;
   desktopIcon: string;
   mobileIcon?: string;
 }[] = [
   {
     id: "expenses",
-    label: "Expenses",
     desktopIcon: "/group-detail/expenses-desktop.svg",
     mobileIcon: "/group-detail/expenses-mobile.svg",
   },
   {
     id: "balances",
-    label: "Balances",
     desktopIcon: "/group-detail/balances-desktop.svg",
     mobileIcon: "/group-detail/balances-mobile.svg",
   },
   {
     id: "statistics",
-    label: "Statistics",
     desktopIcon: "/group-detail/statistics-desktop.svg",
     mobileIcon: "/group-detail/statistics-mobile.svg",
   },
   {
     id: "settings",
-    label: "Settings",
     desktopIcon: "/group-detail/settings-desktop.svg",
   },
 ];
@@ -43,10 +39,11 @@ export default function GroupSectionNav({
   activeSection,
   groupId,
 }: GroupSectionNavProps) {
+  const t = useTranslations("GroupNav");
   const groupPath = `/groups/${encodeURIComponent(groupId)}`;
 
   return (
-    <nav aria-label="Group sections" className="group-detail__tabs">
+    <nav aria-label={t("ariaLabel")} className="group-detail__tabs">
       {sections.map((section) => {
         const isActive = section.id === activeSection;
         const className = [
@@ -76,7 +73,7 @@ export default function GroupSectionNav({
                 width={24}
               />
             )}
-            <span>{section.label}</span>
+            <span>{t(section.id)}</span>
           </>
         );
 

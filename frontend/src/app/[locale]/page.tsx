@@ -1,8 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import SiteHeader from "@/components/auth/SiteHeader";
 import type { AuthUser } from "@/lib/auth-types";
@@ -11,7 +18,7 @@ import {
   apiRequest,
   apiRequestWithCsrf,
 } from "@/lib/api";
-import { currencies } from "@/lib/currencies";
+import { getCurrencies } from "@/lib/currencies";
 
 type Group = {
   id: string;
@@ -77,6 +84,13 @@ export default function Home() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const locale = useLocale();
+  const t = useTranslations("Landing");
+  const dashboardT = useTranslations("Dashboard");
+  const commonT = useTranslations("Common");
+  const currencies = getCurrencies(locale);
+  const router = useRouter();
+  const pathname = usePathname();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const groupUserId = user?.id ?? "";
 
@@ -110,7 +124,7 @@ export default function Home() {
           signal: controller.signal,
         });
         if (!response.ok) {
-          throw new Error(`Unable to load groups (${response.status}).`);
+          throw new Error(dashboardT("loadFailed", { status: response.status }));
         }
 
         const groupRecords = parseGroups(await response.json());
@@ -131,7 +145,9 @@ export default function Home() {
       } catch (error) {
         if (controller.signal.aborted) return;
         setGroupsError(
-          error instanceof Error ? error.message : "An unexpected error occurred.",
+          error instanceof Error && error.message.startsWith("Unable to load groups")
+            ? error.message
+            : commonT("unexpectedError"),
         );
         setGroupsState("error");
       }
@@ -139,7 +155,7 @@ export default function Home() {
 
     void loadGroups();
     return () => controller.abort();
-  }, [groupUserId, refreshKey]);
+  }, [commonT, dashboardT, groupUserId, refreshKey]);
 
   function reloadGroups() {
     setGroupsError("");
@@ -170,14 +186,16 @@ export default function Home() {
         body: JSON.stringify({ name, description, currency }),
       });
       if (!response.ok) {
-        throw new Error(`Group creation failed (${response.status}).`);
+        throw new Error(dashboardT("creationFailed", { status: response.status }));
       }
 
       setIsCreateOpen(false);
       reloadGroups();
     } catch (error) {
       setCreateError(
-        error instanceof Error ? error.message : "An unexpected error occurred.",
+        error instanceof Error && error.message.startsWith("La création") || error instanceof Error && error.message.startsWith("Group creation")
+          ? error.message
+          : commonT("unexpectedError"),
       );
     } finally {
       setIsCreating(false);
@@ -186,41 +204,43 @@ export default function Home() {
 
   return (
     <main className={authResolved && user ? "home-dashboard" : "home-public"}>
-      <SiteHeader onUserChange={handleUserChange} />
+      <SiteHeader
+        onUserChange={handleUserChange}
+      />
 
       {!authResolved ? (
         <div className="home-loading__content">
-          <p>Loading your workspace…</p>
+          <p>{t("loading")}</p>
         </div>
       ) : user ? (
         <>
           <div className="home-dashboard__content">
             <header className="home-dashboard__header">
-              <h1>My groups</h1>
+              <h1>{dashboardT("myGroups")}</h1>
               <button
                 className="home-create-button home-create-button--desktop"
                 onClick={openCreateGroup}
                 type="button"
               >
                 <Image alt="" height={30} src="/groups/add-icon.svg" width={30} />
-                <span>New group</span>
+                <span>{dashboardT("newGroup")}</span>
               </button>
             </header>
 
             <section aria-labelledby="groups-heading" className="home-groups">
-              <h2 className="visually-hidden" id="groups-heading">Your groups</h2>
+              <h2 className="visually-hidden" id="groups-heading">{dashboardT("yourGroups")}</h2>
               {groupsState === "loading" && (
-                <p className="home-groups__status" role="status">Loading groups…</p>
+                <p className="home-groups__status" role="status">{dashboardT("loadingGroups")}</p>
               )}
               {groupsState === "error" && (
                 <div className="home-groups__message" role="alert">
                   <p>{groupsError}</p>
-                  <button onClick={reloadGroups} type="button">Try again</button>
+                  <button onClick={reloadGroups} type="button">{dashboardT("tryAgain")}</button>
                 </div>
               )}
               {groupsState === "ready" && groups.length === 0 && (
                 <div className="home-groups__message">
-                  <p>You don’t have any groups yet.</p>
+                  <p>{dashboardT("empty")}</p>
                 </div>
               )}
               {groupsState === "ready" && groups.length > 0 && (
@@ -249,10 +269,10 @@ export default function Home() {
                         <div className="home-group-card__details">
                           <h3>{group.name}</h3>
                           <div className="home-group-card__metadata">
-                            <span>{group.memberCount} {group.memberCount === 1 ? "member" : "members"}</span>
+                            <span>{dashboardT("memberCount", { count: group.memberCount })}</span>
                             <Image alt="" className="home-group-card__separator" height={5} src="/groups/separator-dot.svg" width={5} />
                             <span className="home-group-card__expenses">
-                              {group.expenseCount} {group.expenseCount === 1 ? "expense" : "expenses"}
+                              {dashboardT("expenseCount", { count: group.expenseCount })}
                             </span>
                           </div>
                         </div>
@@ -265,7 +285,7 @@ export default function Home() {
           </div>
 
           <button
-            aria-label="Create a group"
+            aria-label={dashboardT("createGroupAria")}
             className="home-mobile-add"
             onClick={openCreateGroup}
             type="button"
@@ -285,9 +305,9 @@ export default function Home() {
             >
               <form className="home-create-form" onSubmit={createGroup}>
                 <div className="home-create-form__header">
-                  <h2 id="create-group-title">New group</h2>
+                  <h2 id="create-group-title">{dashboardT("createGroupTitle")}</h2>
                   <button
-                    aria-label="Close"
+                    aria-label={dashboardT("close")}
                     disabled={isCreating}
                     onClick={() => setIsCreateOpen(false)}
                     type="button"
@@ -296,15 +316,15 @@ export default function Home() {
                   </button>
                 </div>
                 <label>
-                  Group name
+                  {dashboardT("groupName")}
                   <input autoComplete="off" maxLength={100} name="name" required />
                 </label>
                 <label>
-                  Description
+                  {dashboardT("description")}
                   <textarea maxLength={1000} name="description" rows={3} />
                 </label>
                 <label>
-                  Currency
+                  {dashboardT("currency")}
                   <select defaultValue="EUR" name="currency">
                     {currencies.map(({ code, label }) => (
                       <option key={code} value={code}>{label}</option>
@@ -313,7 +333,7 @@ export default function Home() {
                 </label>
                 {createError && <p className="home-create-form__error" role="alert">{createError}</p>}
                 <button className="home-create-form__submit" disabled={isCreating} type="submit">
-                  {isCreating ? "Creating…" : "Create group"}
+                  {isCreating ? dashboardT("creating") : dashboardT("create")}
                 </button>
               </form>
             </dialog>
@@ -322,29 +342,40 @@ export default function Home() {
       ) : (
         <div className="home-landing">
           <section aria-labelledby="landing-title" className="home-landing__intro">
-            <p className="home-landing__eyebrow">Shared expenses, made simple</p>
-            <h1 id="landing-title">Keep shared expenses clear and fair.</h1>
-            <p className="home-landing__description">
-              Organize group expenses, track balances, and see who owes what —
-              all in one place.
-            </p>
+            <label className="home-landing__language">
+              <span>{t("language")}</span>
+              <select
+                onChange={(event) => {
+                  const nextLocale = event.target.value;
+                  if (nextLocale !== "en" && nextLocale !== "fr") return;
+                  router.replace(pathname, { locale: nextLocale });
+                }}
+                value={locale}
+              >
+                <option value="en">{t("english")}</option>
+                <option value="fr">{t("french")}</option>
+              </select>
+            </label>
+            <p className="home-landing__eyebrow">{t("eyebrow")}</p>
+            <h1 id="landing-title">{t("title")}</h1>
+            <p className="home-landing__description">{t("description")}</p>
             <Link className="home-landing__primary-action" href="/signup">
-              Get started
+              {t("getStarted")}
             </Link>
           </section>
 
           <section aria-labelledby="how-it-works" className="home-landing__steps">
-            <h2 id="how-it-works">How it works</h2>
+            <h2 id="how-it-works">{t("howItWorks")}</h2>
             <ol>
-              <li><strong>Create a group</strong><span>Set up a trip, household, or shared event.</span></li>
-              <li><strong>Add expenses</strong><span>Record the amount and who paid.</span></li>
-              <li><strong>Settle balances</strong><span>See what each person owes at a glance.</span></li>
+              <li><strong>{t("steps.create.title")}</strong><span>{t("steps.create.description")}</span></li>
+              <li><strong>{t("steps.add.title")}</strong><span>{t("steps.add.description")}</span></li>
+              <li><strong>{t("steps.settle.title")}</strong><span>{t("steps.settle.description")}</span></li>
             </ol>
           </section>
 
           <footer className="home-landing__footer">
             <span>Qui doit quoi</span>
-            <span>Simple, transparent expense sharing.</span>
+            <span>{t("footer")}</span>
           </footer>
         </div>
       )}

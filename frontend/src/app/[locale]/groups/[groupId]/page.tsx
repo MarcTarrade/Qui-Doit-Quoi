@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import GroupSectionNav from "@/components/groups/GroupSectionNav";
@@ -135,15 +136,15 @@ function expenseIcon(category: ExpenseCategory, isMobile: boolean) {
   return null;
 }
 
-function formatExpenseAmount(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-GB", {
+function formatExpenseAmount(amount: number, currency: string, locale: string) {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
   }).format(amount / 100);
 }
 
-function formatExpenseDate(date: string) {
-  return new Intl.DateTimeFormat("en-GB", {
+function formatExpenseDate(date: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -153,6 +154,10 @@ function formatExpenseDate(date: string) {
 export default function GroupDetailPage() {
   const params = useParams<{ groupId: string }>();
   const groupId = params.groupId;
+  const locale = useLocale();
+  const t = useTranslations("Expenses");
+  const commonT = useTranslations("Common");
+  const errorsT = useTranslations("Errors");
   const [group, setGroup] = useState<Group | null>(null);
   const [expenses, setExpenses] = useState<GroupExpense[]>([]);
   const [members, setMembers] = useState<GroupMember[]>([]);
@@ -202,17 +207,15 @@ export default function GroupDetailPage() {
         ]);
 
         if (!groupResponse.ok) {
-          throw new Error(
-            groupResponse.status === 404
-              ? "This group could not be found."
-              : `Unable to load group details (${groupResponse.status}).`,
-          );
+          throw new Error(groupResponse.status === 404
+            ? errorsT("groupNotFound")
+            : errorsT("loadGroupDetails", { status: groupResponse.status }));
         }
         if (!expensesResponse.ok) {
-          throw new Error(`Unable to load expenses (${expensesResponse.status}).`);
+          throw new Error(t("loadFailed", { status: expensesResponse.status }));
         }
         if (!membersResponse.ok) {
-          throw new Error(`Unable to load group members (${membersResponse.status}).`);
+          throw new Error(errorsT("loadGroupMembers", { status: membersResponse.status }));
         }
 
         const [loadedGroup, loadedExpenses, loadedMembers] = await Promise.all([
@@ -230,7 +233,12 @@ export default function GroupDetailPage() {
       } catch (error) {
         if (controller.signal.aborted) return;
         setLoadError(
-          error instanceof Error ? error.message : "An unexpected error occurred.",
+          error instanceof Error &&
+          !error.message.startsWith("The API returned") &&
+          error.name !== "TypeError" &&
+          error.name !== "SyntaxError"
+            ? error.message
+            : commonT("unexpectedError"),
         );
         setLoadState("error");
       }
@@ -238,7 +246,7 @@ export default function GroupDetailPage() {
 
     void loadGroupDetails();
     return () => controller.abort();
-  }, [groupId, refreshKey]);
+  }, [commonT, errorsT, groupId, refreshKey, t]);
 
   function openAddExpense() {
     setEditingExpense(null);
@@ -269,7 +277,7 @@ export default function GroupDetailPage() {
     const category = String(formData.get("category") ?? "");
     const paidById = String(formData.get("paidBy") ?? "");
     if (!Number.isFinite(amountValue) || amountValue <= 0 || amount <= 0 || !Number.isSafeInteger(amount)) {
-      setExpenseFormError("Enter a valid amount.");
+      setExpenseFormError(t("validAmount"));
       return;
     }
 
@@ -291,9 +299,7 @@ export default function GroupDetailPage() {
         }),
       });
       if (!response.ok) {
-        throw new Error(
-          `Expense ${isEditing ? "update" : "creation"} failed (${response.status}).`,
-        );
+        throw new Error(t(isEditing ? "updateFailed" : "createFailed", { status: response.status }));
       }
 
       const savedExpense = parseExpense(await response.json());
@@ -305,7 +311,9 @@ export default function GroupDetailPage() {
       setEditingExpense(null);
     } catch (error) {
       setExpenseFormError(
-        error instanceof Error ? error.message : "An unexpected error occurred.",
+        error instanceof Error && !error.message.startsWith("The API returned")
+          ? error.message
+          : commonT("unexpectedError"),
       );
     } finally {
       setIsSavingExpense(false);
@@ -316,7 +324,7 @@ export default function GroupDetailPage() {
     <main className="group-detail">
       <header className="group-detail__header">
         <Link
-          aria-label="Back to groups"
+          aria-label={commonT("backToGroups")}
           className="group-detail__back"
           href="/"
         >
@@ -324,7 +332,7 @@ export default function GroupDetailPage() {
         </Link>
         <h1>{group?.name}</h1>
         <Link
-          aria-label="Group settings"
+          aria-label={commonT("groupSettings")}
           className="group-detail__settings-link"
           href={`/groups/${encodeURIComponent(groupId)}/settings`}
         >
@@ -335,7 +343,7 @@ export default function GroupDetailPage() {
       <GroupSectionNav activeSection="expenses" groupId={groupId} />
 
       <section aria-labelledby="expenses-title" className="group-detail__content">
-        <h2 className="visually-hidden" id="expenses-title">Group expenses</h2>
+        <h2 className="visually-hidden" id="expenses-title">{t("title")}</h2>
         {loadState === "ready" && members.length > 0 && (
           <button
             className="group-detail__add-button"
@@ -349,22 +357,22 @@ export default function GroupDetailPage() {
               unoptimized
               width={20}
             />
-            <span>Add an expense</span>
+            <span>{t("add")}</span>
           </button>
         )}
         {loadState === "loading" && (
-          <p className="group-detail__status" role="status">Loading expenses…</p>
+          <p className="group-detail__status" role="status">{t("loading")}</p>
         )}
         {loadState === "error" && (
           <div className="group-detail__message" role="alert">
             <p>{loadError}</p>
-            <button onClick={reloadGroup} type="button">Try again</button>
+            <button onClick={reloadGroup} type="button">{commonT("tryAgain")}</button>
           </div>
         )}
         {loadState === "ready" && expenses.length === 0 && (
           <div className="group-detail__message">
-            <p>No expenses in this group yet.</p>
-            {members.length === 0 && <p>Add a member before creating an expense.</p>}
+            <p>{t("empty")}</p>
+            {members.length === 0 && <p>{t("addMemberFirst")}</p>}
           </div>
         )}
         {loadState === "ready" && expenses.length > 0 && (
@@ -386,21 +394,21 @@ export default function GroupDetailPage() {
                   )}
                   <div className="group-expense-card__details">
                     <h3>{expense.description}</h3>
-                    <p className="group-expense-card__payer">Paid by {expense.paidBy}</p>
+                    <p className="group-expense-card__payer">{t("paidBy", { name: expense.paidBy })}</p>
                   </div>
                   <time className="group-expense-card__date" dateTime={expense.createdAt}>
-                    {formatExpenseDate(expense.createdAt)}
+                    {formatExpenseDate(expense.createdAt, locale)}
                   </time>
                   <p className="group-expense-card__amount">
-                    {group && formatExpenseAmount(expense.amount, group.currency)}
+                    {group && formatExpenseAmount(expense.amount, group.currency, locale)}
                   </p>
                   <button
-                    aria-label={`Edit ${expense.description}`}
+                    aria-label={`${t("edit")} ${expense.description}`}
                     className="group-expense-card__edit"
                     onClick={() => openEditExpense(expense)}
                     type="button"
                   >
-                    Edit
+                    {t("edit")}
                   </button>
                 </li>
               );
@@ -411,7 +419,7 @@ export default function GroupDetailPage() {
 
       {loadState === "ready" && members.length > 0 && (
         <button
-          aria-label="Add an expense"
+          aria-label={t("add")}
           className="group-detail__add"
           onClick={openAddExpense}
           type="button"
@@ -438,17 +446,17 @@ export default function GroupDetailPage() {
           >
             <div className="group-detail__form-header">
               <button
-                aria-label="Back to group"
+                aria-label={t("backToGroup")}
                 disabled={isSavingExpense}
                 onClick={closeExpenseDialog}
                 type="button"
               >
                 <Image alt="" height={24} src="/group-detail/back-mobile.svg" width={24} />
               </button>
-              <h2 id="expense-dialog-title">{editingExpense ? "Edit expense" : "Add an expense"}</h2>
+              <h2 id="expense-dialog-title">{editingExpense ? t("editExpense") : t("add")}</h2>
             </div>
             <label>
-              Description
+              {t("description")}
               <input
                 autoComplete="off"
                 defaultValue={editingExpense?.description ?? ""}
@@ -458,7 +466,7 @@ export default function GroupDetailPage() {
               />
             </label>
             <label>
-              Amount ({group?.currency})
+              {t("amount", { currency: group?.currency ?? "" })}
               <input
                 defaultValue={editingExpense ? (editingExpense.amount / 100).toFixed(2) : ""}
                 min="0.01"
@@ -469,22 +477,22 @@ export default function GroupDetailPage() {
               />
             </label>
             <label>
-              Category
+              {t("category")}
               <select defaultValue={editingExpense?.category ?? "FOOD"} name="category">
-                <option value="FOOD">Food</option>
-                <option value="TRANSPORT">Transport</option>
-                <option value="HOUSING">Housing</option>
-                <option value="ENTERTAINMENT">Entertainment</option>
+                <option value="FOOD">{t("food")}</option>
+                <option value="TRANSPORT">{t("transport")}</option>
+                <option value="HOUSING">{t("housing")}</option>
+                <option value="ENTERTAINMENT">{t("entertainment")}</option>
               </select>
             </label>
             <label>
-              Paid by
+              {t("paidByLabel")}
               <select
                 defaultValue={editingExpense?.paidById ?? members[0]?.id ?? ""}
                 name="paidBy"
                 required={!editingExpense}
               >
-                {editingExpense && <option value="">Not assigned</option>}
+                {editingExpense && <option value="">{t("notAssigned")}</option>}
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>{member.name}</option>
                 ))}
@@ -492,7 +500,7 @@ export default function GroupDetailPage() {
             </label>
             {expenseFormError && <p className="group-detail__form-error" role="alert">{expenseFormError}</p>}
             <button className="group-detail__form-submit" disabled={isSavingExpense} type="submit">
-              {isSavingExpense ? "Saving…" : editingExpense ? "Save changes" : "Add expense"}
+              {isSavingExpense ? t("saving") : editingExpense ? t("saveChanges") : t("add")}
             </button>
           </form>
         </dialog>

@@ -1233,6 +1233,34 @@
   text-align: center;
 }
 
+.home-landing__language {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-self: end;
+  gap: 0.625rem;
+  margin-bottom: 1.5rem;
+  color: var(--grey-500);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.home-landing__language select {
+  min-height: 2.5rem;
+  padding: 0 2rem 0 0.75rem;
+  border: 1px solid var(--grey-200);
+  border-radius: 0.5rem;
+  background: white;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.home-landing__language select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .home-landing__intro .home-landing__eyebrow {
   margin-bottom: 1rem;
 }
@@ -1332,6 +1360,10 @@
   .home-landing__intro {
     min-height: auto;
     padding: 5rem 0 4.5rem;
+  }
+
+  .home-landing__language {
+    margin-bottom: 1.25rem;
   }
 
   .home-landing__intro h1 {

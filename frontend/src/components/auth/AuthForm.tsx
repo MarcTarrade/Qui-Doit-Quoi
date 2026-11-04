@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 
 import { apiRequestWithCsrf } from "@/lib/api";
@@ -13,6 +13,7 @@ type AuthFormProps = {
 
 export default function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
+  const t = useTranslations("Auth");
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isSignup = mode === "signup";
@@ -23,7 +24,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     if (isSignup && values.password !== values.confirmPassword) {
-      setError("Passwords do not match.");
+      setError(t("passwordsMismatch"));
       return;
     }
 
@@ -43,21 +44,15 @@ export default function AuthForm({ mode }: AuthFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
-        const message =
-          typeof result === "object" && result !== null && "message" in result &&
-          typeof result.message === "string"
-            ? result.message
-            : "Authentication could not be completed. Please try again.";
-        setError(message);
+        setError(response.status === 401 ? t("invalidCredentials") : t("authenticationFailed"));
         return;
       }
 
       router.replace("/");
       router.refresh();
     } catch {
-      setError("Could not connect to the authentication service. Please try again.");
+      setError(t("connectionFailed"));
     } finally {
       setIsPending(false);
     }
@@ -74,7 +69,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
         <form className={`auth-form auth-form--${mode}`} onSubmit={handleSubmit}>
           <label className="auth-field">
-            <span>{isSignup ? "Username" : "Email"}</span>
+            <span>{isSignup ? t("username") : t("email")}</span>
             <input
               autoComplete={isSignup ? "username" : "email"}
               maxLength={isSignup ? 50 : undefined}
@@ -87,7 +82,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
           {isSignup && (
             <>
               <label className="auth-field">
-                <span>Last name</span>
+                <span>{t("lastName")}</span>
                 <input
                   autoComplete="family-name"
                   maxLength={100}
@@ -96,7 +91,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 />
               </label>
               <label className="auth-field">
-                <span>First name</span>
+                <span>{t("firstName")}</span>
                 <input
                   autoComplete="given-name"
                   maxLength={100}
@@ -105,14 +100,14 @@ export default function AuthForm({ mode }: AuthFormProps) {
                 />
               </label>
               <label className="auth-field">
-                <span>Email</span>
+                <span>{t("email")}</span>
                 <input autoComplete="email" name="email" required type="email" />
               </label>
             </>
           )}
 
           <label className="auth-field">
-            <span>Password</span>
+            <span>{t("password")}</span>
             <input
               autoComplete={isSignup ? "new-password" : "current-password"}
               minLength={isSignup ? 8 : undefined}
@@ -124,7 +119,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
           {isSignup && (
             <label className="auth-field">
-              <span>Confirm password</span>
+              <span>{t("confirmPassword")}</span>
               <input
                 autoComplete="new-password"
                 minLength={8}
@@ -142,18 +137,18 @@ export default function AuthForm({ mode }: AuthFormProps) {
           )}
 
           <button className="action-button auth-submit" disabled={isPending} type="submit">
-            {isPending ? "Please wait..." : isSignup ? "Sign up" : "Log in"}
+            {isPending ? t("pleaseWait") : isSignup ? t("signUp") : t("logIn")}
           </button>
         </form>
 
         <p className={`auth-switch auth-switch--${mode}`}>
-          {isSignup && "Already have an account? "}
+          {isSignup && `${t("alreadyHaveAccount")} `}
           <Link className="auth-switch-link" href={isSignup ? "/login" : "/signup"}>
             {isSignup ? (
-              "Log in"
+              t("logIn")
             ) : (
               <>
-                Sign up here
+                {t("signUpHere")}
                 <Image
                   alt=""
                   aria-hidden="true"

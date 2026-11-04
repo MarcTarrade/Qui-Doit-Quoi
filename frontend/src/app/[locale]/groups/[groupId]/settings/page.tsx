@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import {
   useCallback,
   useEffect,
@@ -13,7 +14,7 @@ import {
 
 import GroupSectionNav from "@/components/groups/GroupSectionNav";
 import { apiImageUrl, apiRequest, apiRequestWithCsrf } from "@/lib/api";
-import { currencies } from "@/lib/currencies";
+import { getCurrencies } from "@/lib/currencies";
 
 type Group = {
   id: string;
@@ -129,19 +130,22 @@ function parseActivityPage(value: unknown): GroupActivityPage {
   };
 }
 
-function describeActivity(log: GroupActivityLog): string {
+function describeActivity(
+  log: GroupActivityLog,
+  t: ReturnType<typeof useTranslations<"Settings">>,
+): string {
   switch (log.type) {
     case "EXPENSE_ADDED":
-      return `An expense was added by ${log.madeByUsername}`;
+      return t("expenseAdded", { name: log.madeByUsername });
     case "GROUP_UPDATED":
-      return `Group settings were modified by ${log.madeByUsername}`;
+      return t("groupUpdated", { name: log.madeByUsername });
     default:
-      return `An activity was recorded by ${log.madeByUsername}`;
+      return t("activityRecorded", { name: log.madeByUsername });
   }
 }
 
-function formatActivityDate(date: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
+function formatActivityDate(date: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -152,6 +156,11 @@ function formatActivityDate(date: string): string {
 
 export default function GroupSettingsPage() {
   const { groupId } = useParams<{ groupId: string }>();
+  const locale = useLocale();
+  const t = useTranslations("Settings");
+  const commonT = useTranslations("Common");
+  const errorsT = useTranslations("Errors");
+  const currencies = getCurrencies(locale);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
@@ -219,14 +228,12 @@ export default function GroupSettingsPage() {
         ]);
 
         if (!groupResponse.ok) {
-          throw new Error(
-            groupResponse.status === 404
-              ? "This group could not be found."
-              : `Unable to load group details (${groupResponse.status}).`,
-          );
+          throw new Error(groupResponse.status === 404
+            ? errorsT("groupNotFound")
+            : errorsT("loadGroupDetails", { status: groupResponse.status }));
         }
         if (!membersResponse.ok) {
-          throw new Error(`Unable to load group members (${membersResponse.status}).`);
+          throw new Error(errorsT("loadGroupMembers", { status: membersResponse.status }));
         }
 
         const [loadedGroup, loadedMembers] = await Promise.all([
@@ -246,7 +253,12 @@ export default function GroupSettingsPage() {
       } catch (error) {
         if (controller.signal.aborted) return;
         setLoadError(
-          error instanceof Error ? error.message : "An unexpected error occurred.",
+          error instanceof Error &&
+          !error.message.startsWith("The API returned") &&
+          error.name !== "TypeError" &&
+          error.name !== "SyntaxError"
+            ? error.message
+            : commonT("unexpectedError"),
         );
         setLoadState("error");
       }
@@ -254,7 +266,7 @@ export default function GroupSettingsPage() {
 
     void loadSettings();
     return () => controller.abort();
-  }, [groupId, refreshKey]);
+  }, [commonT, errorsT, groupId, refreshKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -269,7 +281,7 @@ export default function GroupSettingsPage() {
           { cache: "no-store", signal: controller.signal },
         );
         if (!response.ok) {
-          throw new Error(`Unable to load activity logs (${response.status}).`);
+          throw new Error(errorsT("loadActivity", { status: response.status }));
         }
 
         const page = parseActivityPage(await response.json());
@@ -283,7 +295,12 @@ export default function GroupSettingsPage() {
       } catch (error) {
         if (controller.signal.aborted) return;
         setActivityError(
-          error instanceof Error ? error.message : "An unexpected error occurred.",
+          error instanceof Error &&
+          !error.message.startsWith("The API returned") &&
+          error.name !== "TypeError" &&
+          error.name !== "SyntaxError"
+            ? error.message
+            : commonT("unexpectedError"),
         );
         setActivityLoadState("error");
       }
@@ -291,7 +308,7 @@ export default function GroupSettingsPage() {
 
     void loadActivity();
     return () => controller.abort();
-  }, [activityPage, activityRetryKey, groupId]);
+  }, [activityPage, activityRetryKey, commonT, errorsT, groupId]);
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -315,7 +332,7 @@ export default function GroupSettingsPage() {
         },
       );
       if (!response.ok) {
-        throw new Error(`Saving group settings failed (${response.status}).`);
+        throw new Error(errorsT("saveSettings", { status: response.status }));
       }
 
       const updatedGroup = parseGroup(await response.json());
@@ -328,10 +345,15 @@ export default function GroupSettingsPage() {
       setActivityTotalPages(0);
       setActivityPage(0);
       setActivityRetryKey((current) => current + 1);
-      setSettingsMessage("Group settings saved.");
+      setSettingsMessage(t("settingsSaved"));
     } catch (error) {
       setSettingsError(
-        error instanceof Error ? error.message : "An unexpected error occurred.",
+        error instanceof Error &&
+        !error.message.startsWith("The API returned") &&
+        error.name !== "TypeError" &&
+        error.name !== "SyntaxError"
+          ? error.message
+          : commonT("unexpectedError"),
       );
     } finally {
       setSaving(false);
@@ -352,7 +374,7 @@ export default function GroupSettingsPage() {
         { method: "PUT", body: formData },
       );
       if (!response.ok) {
-        throw new Error(`Uploading the group image failed (${response.status}).`);
+        throw new Error(errorsT("uploadImage", { status: response.status }));
       }
 
       const updatedGroup = parseGroup(await response.json());
@@ -361,10 +383,15 @@ export default function GroupSettingsPage() {
       setSelectedImage(null);
       setImagePreview(null);
       if (imageFileRef.current) imageFileRef.current.value = "";
-      setImageUploadMessage("Group image uploaded.");
+      setImageUploadMessage(t("imageUploaded"));
     } catch (error) {
       setImageUploadError(
-        error instanceof Error ? error.message : "An unexpected error occurred.",
+        error instanceof Error &&
+        !error.message.startsWith("The API returned") &&
+        error.name !== "TypeError" &&
+        error.name !== "SyntaxError"
+          ? error.message
+          : commonT("unexpectedError"),
       );
     } finally {
       setUploadingImage(false);
@@ -388,16 +415,21 @@ export default function GroupSettingsPage() {
         },
       );
       if (!response.ok) {
-        throw new Error(`Adding a group member failed (${response.status}).`);
+        throw new Error(errorsT("addMember", { status: response.status }));
       }
 
       const newMember = parseMembers([await response.json()])[0];
       setMembers((current) => [...current, newMember]);
       setMemberName("");
-      setMemberMessage(`${newMember.name} was added to the group.`);
+      setMemberMessage(t("memberAdded", { name: newMember.name }));
     } catch (error) {
       setMemberError(
-        error instanceof Error ? error.message : "An unexpected error occurred.",
+        error instanceof Error &&
+        !error.message.startsWith("The API returned") &&
+        error.name !== "TypeError" &&
+        error.name !== "SyntaxError"
+          ? error.message
+          : commonT("unexpectedError"),
       );
     } finally {
       setAddingMember(false);
@@ -406,7 +438,7 @@ export default function GroupSettingsPage() {
 
   async function removeMember(member: GroupMember) {
     if (
-      !window.confirm(`Remove ${member.name} from this group?`)
+      !window.confirm(t("confirmRemove", { name: member.name }))
     ) {
       return;
     }
@@ -420,14 +452,19 @@ export default function GroupSettingsPage() {
         { method: "DELETE" },
       );
       if (!response.ok) {
-        throw new Error(`Removing a group member failed (${response.status}).`);
+        throw new Error(errorsT("removeMember", { status: response.status }));
       }
 
       setMembers((current) => current.filter((item) => item.id !== member.id));
-      setMemberMessage(`${member.name} was removed from the group.`);
+      setMemberMessage(t("memberRemoved", { name: member.name }));
     } catch (error) {
       setMemberError(
-        error instanceof Error ? error.message : "An unexpected error occurred.",
+        error instanceof Error &&
+        !error.message.startsWith("The API returned") &&
+        error.name !== "TypeError" &&
+        error.name !== "SyntaxError"
+          ? error.message
+          : commonT("unexpectedError"),
       );
     } finally {
       setRemovingMemberId(null);
@@ -438,7 +475,7 @@ export default function GroupSettingsPage() {
     <main className="group-detail">
       <header className="group-detail__header">
         <Link
-          aria-label="Back to groups"
+          aria-label={commonT("backToGroups")}
           className="group-detail__back"
           href="/"
         >
@@ -449,23 +486,23 @@ export default function GroupSettingsPage() {
 
       <GroupSectionNav activeSection="settings" groupId={groupId} />
 
-      <section aria-label="Group settings" className="group-detail__content group-settings">
+      <section aria-label={t("section")} className="group-detail__content group-settings">
         {loadState === "loading" && (
-          <p className="group-detail__status" role="status">Loading group settings…</p>
+          <p className="group-detail__status" role="status">{t("loading")}</p>
         )}
         {loadState === "error" && (
           <div className="group-detail__message" role="alert">
             <p>{loadError}</p>
-            <button onClick={retry} type="button">Try again</button>
+            <button onClick={retry} type="button">{commonT("tryAgain")}</button>
           </div>
         )}
         {loadState === "ready" && (
           <>
             <form className="group-settings__card group-settings__information" onSubmit={saveSettings}>
-              <h2>Information</h2>
+              <h2>{t("information")}</h2>
               <div className="group-settings__fields">
                 <label>
-                  Group name
+                  {t("groupName")}
                   <input
                     maxLength={100}
                     onChange={(event) => setName(event.target.value)}
@@ -474,7 +511,7 @@ export default function GroupSettingsPage() {
                   />
                 </label>
                 <label>
-                  Currency
+                  {t("currency")}
                   <select
                     onChange={(event) => setCurrency(event.target.value)}
                     required
@@ -489,7 +526,7 @@ export default function GroupSettingsPage() {
                   </select>
                 </label>
                 <label className="group-settings__description">
-                  Description
+                  {t("description")}
                   <textarea
                     maxLength={1000}
                     onChange={(event) => setDescription(event.target.value)}
@@ -499,9 +536,9 @@ export default function GroupSettingsPage() {
                 </label>
               </div>
               <div className="group-settings__image">
-                <span className="group-settings__image-title">Group image</span>
+                <span className="group-settings__image-title">{t("groupImage")}</span>
                 <button
-                  aria-label="Choose group image"
+                  aria-label={t("chooseImage")}
                   className="group-settings__image-preview"
                   disabled={uploadingImage}
                   onClick={() => imageFileRef.current?.click()}
@@ -527,7 +564,7 @@ export default function GroupSettingsPage() {
                 </button>
                 <input
                   accept="image/png,image/jpeg"
-                  aria-label="Choose a PNG or JPEG group image"
+                  aria-label={t("chooseImageFile")}
                   className="group-settings__image-input"
                   disabled={uploadingImage}
                   onChange={(event) => {
@@ -538,14 +575,14 @@ export default function GroupSettingsPage() {
                       setSelectedImage(null);
                       setImagePreview(null);
                       event.target.value = "";
-                      setImageUploadError("Only PNG and JPEG images are supported.");
+                      setImageUploadError(t("invalidImageType"));
                       return;
                     }
                     if (file && file.size > 5 * 1024 * 1024) {
                       setSelectedImage(null);
                       setImagePreview(null);
                       event.target.value = "";
-                      setImageUploadError("Group images must be 5 MB or smaller.");
+                      setImageUploadError(t("imageTooLarge"));
                       return;
                     }
                     setSelectedImage(file);
@@ -554,7 +591,7 @@ export default function GroupSettingsPage() {
                   ref={imageFileRef}
                   type="file"
                 />
-                <p className="group-settings__image-hint">PNG or JPEG, up to 5 MB</p>
+                <p className="group-settings__image-hint">{t("imageHint")}</p>
                 {selectedImage && (
                   <button
                     className="group-detail__form-submit group-settings__image-upload"
@@ -562,7 +599,7 @@ export default function GroupSettingsPage() {
                     onClick={() => void uploadGroupImage()}
                     type="button"
                   >
-                    {uploadingImage ? "Uploading…" : "Upload image"}
+                    {uploadingImage ? t("uploading") : t("uploadImage")}
                   </button>
                 )}
                 {imageUploadError && (
@@ -574,7 +611,7 @@ export default function GroupSettingsPage() {
               </div>
               <div className="group-settings__save">
                 <button className="group-detail__form-submit" disabled={saving} type="submit">
-                  {saving ? "Saving…" : "Save changes"}
+                  {saving ? t("saving") : t("saveChanges")}
                 </button>
                 {settingsError && <p className="group-detail__form-error" role="alert">{settingsError}</p>}
                 {settingsMessage && <p className="group-settings__success" role="status">{settingsMessage}</p>}
@@ -582,7 +619,7 @@ export default function GroupSettingsPage() {
             </form>
 
             <section aria-labelledby="group-members-title" className="group-settings__card">
-              <h2 id="group-members-title">Group members</h2>
+              <h2 id="group-members-title">{t("members")}</h2>
               <ul className="group-settings__members">
                 {members.map((member, index) => {
                   const deleteIcon = `/group-detail/member-delete-${Math.min(index + 1, 4)}.svg`;
@@ -590,7 +627,7 @@ export default function GroupSettingsPage() {
                     <li className="group-settings__member" key={member.id}>
                       <span>{member.name}</span>
                       <button
-                        aria-label={`Remove ${member.name}`}
+                        aria-label={t("removeMember", { name: member.name })}
                         disabled={removingMemberId !== null || addingMember}
                         onClick={() => void removeMember(member)}
                         type="button"
@@ -609,7 +646,7 @@ export default function GroupSettingsPage() {
               </ul>
               <form className="group-settings__add-member" onSubmit={addMember}>
                 <label>
-                  Add a member
+                  {t("addMemberLabel")}
                   <input
                     maxLength={100}
                     onChange={(event) => setMemberName(event.target.value)}
@@ -618,7 +655,7 @@ export default function GroupSettingsPage() {
                   />
                 </label>
                 <button className="group-detail__form-submit" disabled={addingMember} type="submit">
-                  {addingMember ? "Adding…" : "Add member"}
+                  {addingMember ? t("adding") : t("addMember")}
                 </button>
               </form>
               {memberError && <p className="group-detail__form-error" role="alert">{memberError}</p>}
@@ -626,20 +663,20 @@ export default function GroupSettingsPage() {
             </section>
 
             <section aria-labelledby="group-activity-title" className="group-settings__card group-settings__activity">
-              <h2 id="group-activity-title">Activity log</h2>
+              <h2 id="group-activity-title">{t("activity")}</h2>
               {activityLogs.length > 0 && (
                 <ul className="group-settings__activity-list">
                   {activityLogs.map((log) => (
                     <li className="group-settings__activity-entry" key={log.id}>
-                      <span>{describeActivity(log)}</span>
-                      <time dateTime={log.date}>{formatActivityDate(log.date)}</time>
+                      <span>{describeActivity(log, t)}</span>
+                      <time dateTime={log.date}>{formatActivityDate(log.date, locale)}</time>
                     </li>
                   ))}
                 </ul>
               )}
               {activityLoadState === "loading" && (
                 <p className="group-settings__activity-status" role="status">
-                  {activityPage === 0 ? "Loading activity…" : "Loading more activity…"}
+                  {activityPage === 0 ? t("loadingActivity") : t("loadingMore")}
                 </p>
               )}
               {activityLoadState === "error" && (
@@ -649,12 +686,12 @@ export default function GroupSettingsPage() {
                     onClick={() => setActivityRetryKey((current) => current + 1)}
                     type="button"
                   >
-                    Try again
+                    {commonT("tryAgain")}
                   </button>
                 </div>
               )}
               {activityLoadState === "ready" && activityLogs.length === 0 && (
-                <p className="group-settings__activity-status">No activity yet.</p>
+                <p className="group-settings__activity-status">{t("noActivity")}</p>
               )}
               {activityLoadState === "ready" &&
                 activityPage + 1 < activityTotalPages && (
@@ -663,7 +700,7 @@ export default function GroupSettingsPage() {
                     onClick={() => setActivityPage((current) => current + 1)}
                     type="button"
                   >
-                    Load more
+                    {t("loadMore")}
                   </button>
                 )}
             </section>
