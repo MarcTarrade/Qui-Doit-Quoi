@@ -21,7 +21,7 @@ type ApiExpense = {
   description: string;
   amount: number;
   category: "FOOD" | "TRANSPORT" | "HOUSING" | "ENTERTAINMENT";
-  paidBy: ApiMember;
+  paidBy: ApiMember | null;
   createdAt: string;
 };
 
@@ -296,6 +296,38 @@ class MockApi {
       return;
     }
 
+    const expenseMatch = path.match(/^\/api\/expenses\/([^/]+)$/);
+    if (method === "PUT" && expenseMatch) {
+      const expenseId = decodeURIComponent(expenseMatch[1]);
+      const body = this.body(route);
+      this.writes.push({ method, path, body });
+      for (const [groupId, groupExpenses] of this.expenses) {
+        const expense = groupExpenses.find((item) => item.id === expenseId);
+        if (!expense) continue;
+
+        const payerId =
+          typeof body.paidBy === "object" &&
+          body.paidBy !== null &&
+          "id" in body.paidBy
+            ? String(body.paidBy.id)
+            : "";
+        const payer = (this.members.get(groupId) ?? []).find(
+          (member) => member.id === payerId,
+        );
+        Object.assign(expense, {
+          description: String(body.description),
+          amount: Number(body.amount),
+          category: body.category as ApiExpense["category"],
+          paidBy: payer ?? null,
+        });
+        await this.fulfill(route, expense);
+        return;
+      }
+
+      await this.fulfill(route, { message: "Expense not found." }, 404);
+      return;
+    }
+
     const expensesMatch = path.match(/^\/api\/groups\/([^/]+)\/expenses$/);
     if (expensesMatch) {
       const groupId = decodeURIComponent(expensesMatch[1]);
@@ -371,7 +403,7 @@ class MockApi {
     const balances = new Map(groupMembers.map((member) => [member.id, 0]));
     const total = groupExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     for (const expense of groupExpenses) {
-      if (balances.has(expense.paidBy.id)) {
+      if (expense.paidBy && balances.has(expense.paidBy.id)) {
         balances.set(
           expense.paidBy.id,
           (balances.get(expense.paidBy.id) ?? 0) + expense.amount,
@@ -558,12 +590,40 @@ test("creates a group, adds an expense, and displays the calculated balance", as
     paidBy: { id: "member-1" },
   });
 
+  await page.getByRole("button", { name: "Edit Ski passes" }).click();
+  await expect(page.getByRole("heading", { name: "Edit expense" })).toBeVisible();
+  const dialogBounds = await page.getByRole("dialog").boundingBox();
+  const viewport = page.viewportSize();
+  if (!dialogBounds || !viewport) {
+    throw new Error("The edit dialog or viewport bounds are unavailable.");
+  }
+  expect(Math.abs(dialogBounds.x + dialogBounds.width / 2 - viewport.width / 2)).toBeLessThanOrEqual(1);
+  expect(Math.abs(dialogBounds.y + dialogBounds.height / 2 - viewport.height / 2)).toBeLessThanOrEqual(1);
+  await expect(page.getByLabel("Description")).toHaveValue("Ski passes");
+  await expect(page.getByLabel(/Amount/)).toHaveValue("60.00");
+  await expect(page.getByLabel("Paid by")).toHaveValue("member-1");
+  await page.getByLabel("Description").fill("Lift tickets");
+  await page.getByLabel(/Amount/).fill("80");
+  await page.getByLabel("Paid by").selectOption("member-2");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Lift tickets")).toBeVisible();
+  await expect(page.getByText("Ski passes")).toHaveCount(0);
+  expect(api.writes.find((write) => write.method === "PUT")).toMatchObject({
+    path: "/api/expenses/expense-1",
+    body: {
+      description: "Lift tickets",
+      amount: 8000,
+      category: "ENTERTAINMENT",
+      paidBy: { id: "member-2" },
+    },
+  });
+
   await page.getByRole("link", { name: "Balances" }).click();
   await expect(page.getByRole("heading", { name: "Debt breakdown" })).toBeVisible();
   const balancesBackLink = page.getByRole("link", { name: "Back to groups" });
   await expect(balancesBackLink).toHaveAttribute("href", "/");
-  await expect(page.getByText("Alex owes Marc")).toBeVisible();
-  await expect(page.getByText("€30.00")).toBeVisible();
+  await expect(page.getByText("Marc owes Alex")).toBeVisible();
+  await expect(page.getByText("€40.00")).toBeVisible();
   await balancesBackLink.click();
   await expect(page).toHaveURL("/");
   await expect(page.getByRole("heading", { name: "My groups" })).toBeVisible();

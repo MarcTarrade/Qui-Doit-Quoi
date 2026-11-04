@@ -27,6 +27,7 @@ type GroupExpense = {
   amount: number;
   category: ExpenseCategory;
   paidBy: string;
+  paidById: string | null;
   createdAt: string;
 };
 
@@ -45,12 +46,16 @@ function isExpenseCategory(value: unknown): value is ExpenseCategory {
   );
 }
 
-function parsePayer(value: unknown): string {
-  if (value === null) return "Unknown";
-  if (!isRecord(value) || typeof value.name !== "string") {
+function parsePayer(value: unknown): { name: string; id: string | null } {
+  if (value === null) return { name: "Unknown", id: null };
+  if (
+    !isRecord(value) ||
+    typeof value.name !== "string" ||
+    (value.id !== null && typeof value.id !== "string")
+  ) {
     throw new Error("The API returned an invalid expense payer.");
   }
-  return value.name;
+  return { name: value.name, id: value.id };
 }
 
 function parseGroup(value: unknown): Group {
@@ -67,36 +72,40 @@ function parseGroup(value: unknown): Group {
   return { id: value.id, name: value.name, currency: value.currency };
 }
 
+function parseExpense(value: unknown): GroupExpense {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    typeof value.description !== "string" ||
+    typeof value.amount !== "number" ||
+    !Number.isSafeInteger(value.amount) ||
+    value.amount < 0 ||
+    !isExpenseCategory(value.category) ||
+    typeof value.createdAt !== "string" ||
+    Number.isNaN(Date.parse(value.createdAt))
+  ) {
+    throw new Error("The API returned an invalid expense.");
+  }
+
+  const payer = parsePayer(value.paidBy);
+  return {
+    id: value.id,
+    description: value.description,
+    amount: value.amount,
+    category: value.category,
+    paidBy: payer.name,
+    paidById: payer.id,
+    createdAt: value.createdAt,
+  };
+}
+
 function parseExpenses(value: unknown): GroupExpense[] {
   if (!Array.isArray(value)) {
     throw new Error("The API returned an invalid expenses list.");
   }
 
-  return value.map((item) => {
-    if (
-      !isRecord(item) ||
-      typeof item.id !== "string" ||
-      typeof item.description !== "string" ||
-      typeof item.amount !== "number" ||
-      !Number.isSafeInteger(item.amount) ||
-      item.amount < 0 ||
-      !isExpenseCategory(item.category) ||
-      typeof item.createdAt !== "string" ||
-      Number.isNaN(Date.parse(item.createdAt))
-    ) {
-      throw new Error("The API returned an invalid expense.");
-    }
-
-    const expense: GroupExpense = {
-      id: item.id,
-      description: item.description,
-      amount: item.amount,
-      category: item.category,
-      paidBy: parsePayer(item.paidBy),
-      createdAt: item.createdAt,
-    };
-    return expense;
-  }).sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt));
+  return value.map(parseExpense)
+    .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt));
 }
 
 function parseMembers(value: unknown): GroupMember[] {
@@ -150,9 +159,10 @@ export default function GroupDetailPage() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [loadError, setLoadError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
-  const [isAddingExpense, setIsAddingExpense] = useState(false);
-  const [addExpenseError, setAddExpenseError] = useState("");
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<GroupExpense | null>(null);
+  const [isSavingExpense, setIsSavingExpense] = useState(false);
+  const [expenseFormError, setExpenseFormError] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const reloadGroup = useCallback(() => {
@@ -167,9 +177,9 @@ export default function GroupDetailPage() {
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (isAddExpenseOpen && !dialog.open) dialog.showModal();
-    if (!isAddExpenseOpen && dialog.open) dialog.close();
-  }, [isAddExpenseOpen]);
+    if (isExpenseDialogOpen && !dialog.open) dialog.showModal();
+    if (!isExpenseDialogOpen && dialog.open) dialog.close();
+  }, [isExpenseDialogOpen]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -230,7 +240,25 @@ export default function GroupDetailPage() {
     return () => controller.abort();
   }, [groupId, refreshKey]);
 
-  async function addExpense(event: FormEvent<HTMLFormElement>) {
+  function openAddExpense() {
+    setEditingExpense(null);
+    setExpenseFormError("");
+    setIsExpenseDialogOpen(true);
+  }
+
+  function openEditExpense(expense: GroupExpense) {
+    setEditingExpense(expense);
+    setExpenseFormError("");
+    setIsExpenseDialogOpen(true);
+  }
+
+  function closeExpenseDialog() {
+    if (isSavingExpense) return;
+    setIsExpenseDialogOpen(false);
+    setEditingExpense(null);
+  }
+
+  async function saveExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!group) return;
 
@@ -241,35 +269,46 @@ export default function GroupDetailPage() {
     const category = String(formData.get("category") ?? "");
     const paidById = String(formData.get("paidBy") ?? "");
     if (!Number.isFinite(amountValue) || amountValue <= 0 || amount <= 0 || !Number.isSafeInteger(amount)) {
-      setAddExpenseError("Enter a valid amount.");
+      setExpenseFormError("Enter a valid amount.");
       return;
     }
 
-    setAddExpenseError("");
-    setIsAddingExpense(true);
+    setExpenseFormError("");
+    setIsSavingExpense(true);
     try {
-      const response = await apiRequestWithCsrf(`/api/groups/${encodeURIComponent(group.id)}/expenses`, {
-        method: "POST",
+      const isEditing = editingExpense !== null;
+      const endpoint = isEditing
+        ? `/api/expenses/${encodeURIComponent(editingExpense.id)}`
+        : `/api/groups/${encodeURIComponent(group.id)}/expenses`;
+      const response = await apiRequestWithCsrf(endpoint, {
+        method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           description,
           amount,
           category,
-          paidBy: { id: paidById },
+          paidBy: paidById ? { id: paidById } : null,
         }),
       });
       if (!response.ok) {
-        throw new Error(`Expense creation failed (${response.status}).`);
+        throw new Error(
+          `Expense ${isEditing ? "update" : "creation"} failed (${response.status}).`,
+        );
       }
 
-      setIsAddExpenseOpen(false);
-      reloadGroup();
+      const savedExpense = parseExpense(await response.json());
+      setExpenses((current) => current
+        .filter((expense) => expense.id !== savedExpense.id)
+        .concat(savedExpense)
+        .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt)));
+      setIsExpenseDialogOpen(false);
+      setEditingExpense(null);
     } catch (error) {
-      setAddExpenseError(
+      setExpenseFormError(
         error instanceof Error ? error.message : "An unexpected error occurred.",
       );
     } finally {
-      setIsAddingExpense(false);
+      setIsSavingExpense(false);
     }
   }
 
@@ -300,10 +339,7 @@ export default function GroupDetailPage() {
         {loadState === "ready" && members.length > 0 && (
           <button
             className="group-detail__add-button"
-            onClick={() => {
-              setAddExpenseError("");
-              setIsAddExpenseOpen(true);
-            }}
+            onClick={openAddExpense}
             type="button"
           >
             <Image
@@ -358,6 +394,14 @@ export default function GroupDetailPage() {
                   <p className="group-expense-card__amount">
                     {group && formatExpenseAmount(expense.amount, group.currency)}
                   </p>
+                  <button
+                    aria-label={`Edit ${expense.description}`}
+                    className="group-expense-card__edit"
+                    onClick={() => openEditExpense(expense)}
+                    type="button"
+                  >
+                    Edit
+                  </button>
                 </li>
               );
             })}
@@ -369,10 +413,7 @@ export default function GroupDetailPage() {
         <button
           aria-label="Add an expense"
           className="group-detail__add"
-          onClick={() => {
-            setAddExpenseError("");
-            setIsAddExpenseOpen(true);
-          }}
+          onClick={openAddExpense}
           type="button"
         >
           <Image alt="" className="group-detail__add-circle" height={60} src="/group-detail/add-circle-mobile.svg" width={60} />
@@ -380,39 +421,56 @@ export default function GroupDetailPage() {
         </button>
       )}
 
-      {isAddExpenseOpen && (
+      {isExpenseDialogOpen && (
         <dialog
-          aria-labelledby="add-expense-title"
+          aria-labelledby="expense-dialog-title"
           className="group-detail__dialog"
           onCancel={(event) => {
             event.preventDefault();
-            if (!isAddingExpense) setIsAddExpenseOpen(false);
+            closeExpenseDialog();
           }}
           ref={dialogRef}
         >
-          <form className="group-detail__form" onSubmit={addExpense}>
+          <form
+            className="group-detail__form"
+            key={editingExpense?.id ?? "new-expense"}
+            onSubmit={saveExpense}
+          >
             <div className="group-detail__form-header">
               <button
                 aria-label="Back to group"
-                disabled={isAddingExpense}
-                onClick={() => setIsAddExpenseOpen(false)}
+                disabled={isSavingExpense}
+                onClick={closeExpenseDialog}
                 type="button"
               >
                 <Image alt="" height={24} src="/group-detail/back-mobile.svg" width={24} />
               </button>
-              <h2 id="add-expense-title">Add an expense</h2>
+              <h2 id="expense-dialog-title">{editingExpense ? "Edit expense" : "Add an expense"}</h2>
             </div>
             <label>
               Description
-              <input autoComplete="off" maxLength={1000} name="description" required />
+              <input
+                autoComplete="off"
+                defaultValue={editingExpense?.description ?? ""}
+                maxLength={1000}
+                name="description"
+                required
+              />
             </label>
             <label>
               Amount ({group?.currency})
-              <input min="0.01" name="amount" required step="0.01" type="number" />
+              <input
+                defaultValue={editingExpense ? (editingExpense.amount / 100).toFixed(2) : ""}
+                min="0.01"
+                name="amount"
+                required
+                step="0.01"
+                type="number"
+              />
             </label>
             <label>
               Category
-              <select defaultValue="FOOD" name="category">
+              <select defaultValue={editingExpense?.category ?? "FOOD"} name="category">
                 <option value="FOOD">Food</option>
                 <option value="TRANSPORT">Transport</option>
                 <option value="HOUSING">Housing</option>
@@ -421,15 +479,20 @@ export default function GroupDetailPage() {
             </label>
             <label>
               Paid by
-              <select defaultValue={members[0]?.id} name="paidBy" required>
+              <select
+                defaultValue={editingExpense?.paidById ?? members[0]?.id ?? ""}
+                name="paidBy"
+                required={!editingExpense}
+              >
+                {editingExpense && <option value="">Not assigned</option>}
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>{member.name}</option>
                 ))}
               </select>
             </label>
-            {addExpenseError && <p className="group-detail__form-error" role="alert">{addExpenseError}</p>}
-            <button className="group-detail__form-submit" disabled={isAddingExpense} type="submit">
-              {isAddingExpense ? "Adding…" : "Add expense"}
+            {expenseFormError && <p className="group-detail__form-error" role="alert">{expenseFormError}</p>}
+            <button className="group-detail__form-submit" disabled={isSavingExpense} type="submit">
+              {isSavingExpense ? "Saving…" : editingExpense ? "Save changes" : "Add expense"}
             </button>
           </form>
         </dialog>
