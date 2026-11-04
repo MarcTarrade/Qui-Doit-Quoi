@@ -241,6 +241,7 @@ class MockApi {
         last: page + 1 >= totalPages,
         empty: content.length === 0,
       });
+      return;
     }
     const groupImageMatch = path.match(/^\/api\/groups\/([^/]+)\/image$/);
     if (method === "PUT" && groupImageMatch) {
