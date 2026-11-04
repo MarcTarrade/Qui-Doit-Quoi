@@ -32,17 +32,17 @@ public class Expense {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @NotBlank(message = "Expense description is required")
-    @Size(max = 1000, message = "Description must not exceed 1000 characters")
+    @NotBlank(message = "{validation.expense-description.required}")
+    @Size(max = 1000, message = "{validation.expense-description.max}")
     @Column(nullable = false, length = 1000)
     private String description;
 
-    @NotNull(message = "Amount is required")
-    @Positive(message = "Amount must be greater than zero")
+    @NotNull(message = "{validation.amount.required}")
+    @Positive(message = "{validation.amount.positive}")
     @Column(nullable = false)
     private Long amount;
 
-    @NotNull(message = "Category is required")
+    @NotNull(message = "{validation.category.required}")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Category category;

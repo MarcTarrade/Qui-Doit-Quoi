@@ -5,26 +5,26 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record SignupRequest(
-        @NotBlank(message = "Username is required")
-        @Size(max = 50, message = "Username must not exceed 50 characters")
+        @NotBlank(message = "{validation.username.required}")
+        @Size(max = 50, message = "{validation.username.max}")
         String username,
 
-        @NotBlank(message = "Last name is required")
-        @Size(max = 100, message = "Last name must not exceed 100 characters")
+        @NotBlank(message = "{validation.lastname.required}")
+        @Size(max = 100, message = "{validation.lastname.max}")
         String lastname,
 
-        @NotBlank(message = "First name is required")
-        @Size(max = 100, message = "First name must not exceed 100 characters")
+        @NotBlank(message = "{validation.firstname.required}")
+        @Size(max = 100, message = "{validation.firstname.max}")
         String firstname,
 
-        @NotBlank(message = "Email is required")
-        @Email(message = "Email must be a valid address")
+        @NotBlank(message = "{validation.email.required}")
+        @Email(message = "{validation.email.invalid}")
         String email,
 
-        @NotBlank(message = "Password is required")
-        @Size(min = 8, message = "Password must be at least 8 characters long")
+        @NotBlank(message = "{validation.password.required}")
+        @Size(min = 8, message = "{validation.password.min}")
         String password,
 
-        @Size(max = 2048, message = "Image URL must not exceed 2048 characters")
+        @Size(max = 2048, message = "{validation.image-url.max}")
         String img) {
 }

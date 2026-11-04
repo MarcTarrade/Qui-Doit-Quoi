@@ -39,16 +39,16 @@ public class GroupImageStorageService {
 
     public UUID store(UUID groupId, MultipartFile upload) {
         if (upload == null || upload.isEmpty()) {
-            throw new InvalidGroupImageException("Choose a PNG or JPEG image to upload.");
+            throw new InvalidGroupImageException("api.error.image-empty");
         }
         if (upload.getSize() > MAX_IMAGE_SIZE_BYTES) {
-            throw new InvalidGroupImageException("Group images must be 5 MB or smaller.");
+            throw new InvalidGroupImageException("api.error.image-too-large");
         }
 
         try {
             byte[] content = upload.getBytes();
             if (content.length > MAX_IMAGE_SIZE_BYTES) {
-                throw new InvalidGroupImageException("Group images must be 5 MB or smaller.");
+                throw new InvalidGroupImageException("api.error.image-too-large");
             }
             ValidatedImage image = validateAndNormalize(content);
             UUID imageId = UUID.randomUUID();
@@ -121,12 +121,12 @@ public class GroupImageStorageService {
     private ValidatedImage validateAndNormalize(byte[] content) throws IOException {
         try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
             if (input == null) {
-                throw new InvalidGroupImageException("The uploaded file is not a valid PNG or JPEG image.");
+                throw new InvalidGroupImageException("api.error.image-invalid");
             }
 
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) {
-                throw new InvalidGroupImageException("The uploaded file is not a valid PNG or JPEG image.");
+                throw new InvalidGroupImageException("api.error.image-invalid");
             }
 
             ImageReader reader = readers.next();
@@ -142,7 +142,7 @@ public class GroupImageStorageService {
                     extension = "jpg";
                     mediaType = MediaType.IMAGE_JPEG;
                 } else {
-                    throw new InvalidGroupImageException("Only PNG and JPEG images are supported.");
+                    throw new InvalidGroupImageException("api.error.image-unsupported");
                 }
 
                 int width = reader.getWidth(0);
@@ -150,13 +150,12 @@ public class GroupImageStorageService {
                 if (width <= 0 || height <= 0 ||
                         width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION ||
                         (long) width * height > MAX_IMAGE_PIXELS) {
-                    throw new InvalidGroupImageException(
-                            "Image dimensions must be at most 4096 by 4096 pixels.");
+                    throw new InvalidGroupImageException("api.error.image-dimensions");
                 }
 
                 BufferedImage decoded = reader.read(0);
                 if (decoded == null) {
-                    throw new InvalidGroupImageException("The uploaded image could not be decoded.");
+                    throw new InvalidGroupImageException("api.error.image-decode");
                 }
 
                 try (ByteArrayOutputStream normalized = new ByteArrayOutputStream()) {
@@ -165,7 +164,7 @@ public class GroupImageStorageService {
                     }
                     byte[] normalizedContent = normalized.toByteArray();
                     if (normalizedContent.length > MAX_IMAGE_SIZE_BYTES) {
-                        throw new InvalidGroupImageException("Normalized group images must be 5 MB or smaller.");
+                        throw new InvalidGroupImageException("api.error.image-normalized-too-large");
                     }
                     return new ValidatedImage(extension, mediaType, normalizedContent);
                 }
@@ -175,7 +174,7 @@ public class GroupImageStorageService {
         } catch (InvalidGroupImageException exception) {
             throw exception;
         } catch (IOException exception) {
-            throw new InvalidGroupImageException("The uploaded file is not a valid PNG or JPEG image.", exception);
+            throw new InvalidGroupImageException("api.error.image-invalid", exception);
         }
     }
 

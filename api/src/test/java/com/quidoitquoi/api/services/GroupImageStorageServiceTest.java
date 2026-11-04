@@ -66,7 +66,7 @@ class GroupImageStorageServiceTest {
 
         assertThatThrownBy(() -> storage.store(GROUP_ID, upload))
                 .isInstanceOf(InvalidGroupImageException.class)
-                .hasMessageContaining("5 MB");
+                .hasMessage("api.error.image-too-large");
     }
 
     private byte[] pngImage() throws Exception {

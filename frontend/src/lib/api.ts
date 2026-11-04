@@ -6,8 +6,15 @@ export function apiImageUrl(image: string | null): string | null {
 }
 
 export function apiRequest(path: string, options: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(options.headers);
+  const locale = typeof document === "undefined" ? undefined : document.documentElement.lang;
+  if (locale === "en" || locale === "fr") {
+    headers.set("Accept-Language", locale);
+  }
+
   return fetch(`${apiUrl}${path}`, {
     ...options,
+    headers,
     credentials: "include",
   });
 }

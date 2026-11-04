@@ -38,6 +38,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.quidoitquoi.api.dto.GroupLogResponse;
 import com.quidoitquoi.api.exceptions.GlobalExceptionHandler;
+import com.quidoitquoi.api.config.ApiLocaleConfig;
 import com.quidoitquoi.api.models.Group;
 import com.quidoitquoi.api.models.Settlement;
 import com.quidoitquoi.api.models.User;
@@ -68,6 +69,7 @@ class GroupControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(groupController)
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setLocaleResolver(new ApiLocaleConfig().localeResolver())
                 .build();
         admin = new User(
             "jdoe",
@@ -194,6 +196,7 @@ class GroupControllerTest {
         when(groupService.createGroup(eq(USER_ID), any(Group.class), eq(USER_ID))).thenReturn(group);
 
         mockMvc.perform(post("/api/groups/{userId}", USER_ID)
+                        .header("Accept-Language", "en")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(groupJson()))
                 .andExpect(status().isCreated())
@@ -205,6 +208,7 @@ class GroupControllerTest {
     @Test
     void createGroupRejectsInvalidInput() throws Exception {
         mockMvc.perform(post("/api/groups/{userId}", USER_ID)
+                        .header("Accept-Language", "en")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -215,8 +219,25 @@ class GroupControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(containsString("Group name is required")))
-                .andExpect(jsonPath("$.message").value(containsString("Currency is required")));
+                .andExpect(jsonPath("$.message").isNotEmpty());
+    }
+
+    @Test
+    void createGroupReturnsFrenchValidationErrorsWhenRequested() throws Exception {
+        mockMvc.perform(post("/api/groups/{userId}", USER_ID)
+                        .header("Accept-Language", "fr")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "",
+                                  "description": "Shared trip expenses",
+                                  "img": "https://example.com/trip.jpg",
+                                  "currency": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("Le nom du groupe est obligatoire")))
+                .andExpect(jsonPath("$.message").value(containsString("La devise est obligatoire")));
     }
 
     @Test

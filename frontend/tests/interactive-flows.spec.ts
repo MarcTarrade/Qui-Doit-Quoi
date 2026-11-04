@@ -63,6 +63,7 @@ class MockApi {
   readonly activityLogs = new Map<string, ApiGroupLog[]>();
   readonly writes: WriteRequest[] = [];
   readonly requests: string[] = [];
+  readonly acceptLanguages: string[] = [];
   readonly failedRequests: string[] = [];
   private readonly failures: Map<string, number>;
   private authenticated: boolean;
@@ -120,6 +121,8 @@ class MockApi {
     const path = url.pathname;
     const method = request.method();
     this.requests.push(`${method} ${path}`);
+    const acceptLanguage = request.headers()["accept-language"];
+    if (acceptLanguage) this.acceptLanguages.push(acceptLanguage);
 
     if (method === "OPTIONS") {
       await route.fulfill({
@@ -597,6 +600,7 @@ test("French translations are used across authentication and group pages", async
   await page.goto("/fr");
   await expect(page.getByRole("heading", { name: "Mes groupes" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Nouveau groupe" })).toBeVisible();
+  expect(api.acceptLanguages).toContain("fr");
   await page.getByRole("link", { name: /Lapland trip/ }).click();
   await expect(page.getByRole("navigation", { name: "Sections du groupe" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ajouter une dépense" })).toBeVisible();

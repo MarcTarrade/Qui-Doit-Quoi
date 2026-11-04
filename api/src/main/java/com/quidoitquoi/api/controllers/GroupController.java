@@ -108,8 +108,8 @@ public class GroupController {
     @ApiResponse(responseCode = "404", description = "Group not found")
     public ResponseEntity<Page<GroupLogResponse>> getGroupLogs(
             @PathVariable UUID id,
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "10") @Min(1) int size,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "{validation.page.min}") int page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "{validation.page-size.min}") int size,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(groupService.getGroupLogs(id, page, size, authenticatedUserId(jwt)));
     }
