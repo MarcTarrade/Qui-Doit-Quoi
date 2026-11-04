@@ -13,6 +13,7 @@ import {
   apiUrl,
   checkApiConnection,
 } from "@/lib/api";
+import { currencies } from "@/lib/currencies";
 
 type Group = {
   id: string;
@@ -315,11 +316,9 @@ export default function Home() {
                 <label>
                   Currency
                   <select defaultValue="EUR" name="currency">
-                    <option value="EUR">EUR — Euro</option>
-                    <option value="USD">USD — US Dollar</option>
-                    <option value="GBP">GBP — Pound sterling</option>
-                    <option value="CAD">CAD — Canadian dollar</option>
-                    <option value="CHF">CHF — Swiss franc</option>
+                    {currencies.map(({ code, label }) => (
+                      <option key={code} value={code}>{label}</option>
+                    ))}
                   </select>
                 </label>
                 {createError && <p className="home-create-form__error" role="alert">{createError}</p>}

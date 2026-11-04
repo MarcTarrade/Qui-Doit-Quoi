@@ -512,6 +512,7 @@ test("creates a group, adds an expense, and displays the calculated balance", as
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByLabel("Group name").fill("Lapland trip");
   await page.getByLabel("Description").fill("Ski holiday");
+  expect(await page.getByLabel("Currency").locator("option").count()).toBeGreaterThan(100);
   await page.getByLabel("Currency").selectOption("EUR");
   await page.getByRole("button", { name: "Create group" }).click();
   await expect(page.getByRole("link", { name: /Lapland trip/ })).toBeVisible();
@@ -604,11 +605,12 @@ test("group settings update details and support add, cancel, and remove member a
   await expect(page.getByText("An expense was added by Baptiste")).toBeVisible();
   await page.getByRole("button", { name: "Load more" }).click();
   await expect(page.getByText("Group settings were modified by User 9")).toBeVisible();
+  expect(await page.getByLabel("Currency").locator("option").count()).toBeGreaterThan(100);
   const settingsBackLink = page.getByRole("link", { name: "Back to groups" });
   await expect(settingsBackLink).toHaveAttribute("href", "/");
 
   await page.getByLabel("Group name").fill("Updated trip");
-  await page.getByLabel("Currency").fill("usd");
+  await page.getByLabel("Currency").selectOption("USD");
   await page.getByLabel("Description").fill("Updated description");
   const saveButton = page.getByRole("button", { name: "Save changes" });
   const saveButtonX = (await saveButton.boundingBox())?.x;
