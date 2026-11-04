@@ -461,7 +461,8 @@
 }
 
 .group-settings input,
-.group-settings textarea {
+.group-settings textarea,
+.group-settings select {
   box-sizing: border-box;
   width: 100%;
   min-height: 2.75rem;
@@ -481,6 +482,7 @@
 
 .group-settings input:focus-visible,
 .group-settings textarea:focus-visible,
+.group-settings select:focus-visible,
 .group-settings button:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px;

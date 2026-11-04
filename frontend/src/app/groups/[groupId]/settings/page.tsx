@@ -13,6 +13,7 @@ import {
 
 import GroupSectionNav from "@/components/groups/GroupSectionNav";
 import { apiImageUrl, apiRequest, apiRequestWithCsrf } from "@/lib/api";
+import { currencies } from "@/lib/currencies";
 
 type Group = {
   id: string;
@@ -474,15 +475,18 @@ export default function GroupSettingsPage() {
                 </label>
                 <label>
                   Currency
-                  <input
-                    autoCapitalize="characters"
-                    maxLength={3}
-                    onChange={(event) => setCurrency(event.target.value.toUpperCase())}
-                    pattern="[A-Z]{3}"
+                  <select
+                    onChange={(event) => setCurrency(event.target.value)}
                     required
-                    title="Enter a 3-letter ISO currency code, such as EUR or USD."
                     value={currency}
-                  />
+                  >
+                    {currency && !currencies.some(({ code }) => code === currency) && (
+                      <option value={currency}>{currency}</option>
+                    )}
+                    {currencies.map(({ code, label }) => (
+                      <option key={code} value={code}>{label}</option>
+                    ))}
+                  </select>
                 </label>
                 <label className="group-settings__description">
                   Description
