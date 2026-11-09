@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB in .env.pi}
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER in .env.pi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env.pi}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: ./api
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Define POSTGRES_DB in .env.pi}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?Define POSTGRES_USER in .env.pi}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD in .env.pi}
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DOCKER_COMPOSE_LIFECYCLE_MANAGEMENT: none
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET in .env.pi}
+      JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:-true}
+      CORS_ALLOWED_ORIGINS: https://${DUCKDNS_SUBDOMAIN:?Define DUCKDNS_SUBDOMAIN in .env.pi}.duckdns.org
+      JWT_COOKIE_SAME_SITE: ${JWT_COOKIE_SAME_SITE:-Lax}
+      GROUP_IMAGE_STORAGE_PATH: /app/uploads/group-images
+    volumes:
+      - group_images:/app/uploads/group-images
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://${DUCKDNS_SUBDOMAIN:?Define DUCKDNS_SUBDOMAIN in .env.pi}.duckdns.org
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8080
+    depends_on:
+      - api
+
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Paris
+      SUBDOMAINS: ${DUCKDNS_SUBDOMAIN:?Define DUCKDNS_SUBDOMAIN in .env.pi}
+      TOKEN: ${DUCKDNS_TOKEN:?Define DUCKDNS_TOKEN in .env.pi}
+      LOG_FILE: "false"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DUCKDNS_SUBDOMAIN:?Define DUCKDNS_SUBDOMAIN in .env.pi}.duckdns.org
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - frontend
+
+volumes:
+  postgres_data:
+  group_images:
+  caddy_data:
+  caddy_config:
